@@ -148,7 +148,11 @@ class Renderer:
         
         color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
         color = color.astype(np.float32) / 255.0
-        
+      
+	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
+        # See https://github.com/mmatl/pyrender/issues/148 
+        self.__del__()
+ 
         return color
 
     def add_lighting(self, scene, cam_node, color=np.ones(3), intensity=1.0):
