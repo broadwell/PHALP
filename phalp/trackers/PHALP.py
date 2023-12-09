@@ -57,7 +57,7 @@ class PHALP(nn.Module):
         
         # setup Detectron2, override this function to use your own model
         self.setup_detectron2()
-        
+       
         # create a visualizer
         self.setup_visualizer()
         

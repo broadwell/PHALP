@@ -14,8 +14,9 @@ class VideoConfig:
     extract_video: bool = True
     base_path: Optional[str] = None
     start_frame: int = -1
-    end_frame: int = 1300
+    end_frame: int = -1
     useffmpeg: bool = False
+    vis_results: bool = False # False = inference only, no vis
 
     # this will be used if extract_video=False
     start_time: str = '0s'
@@ -61,7 +62,7 @@ class HMRConfig:
 
 @dataclass
 class RenderConfig:
-    enable: bool = True
+    enable: bool = False # for inference only, no viz
     type: str = 'HUMAN_MESH' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
     up_scale: int = 2
     res: int = 256
@@ -126,7 +127,7 @@ class ExtraConfig:
 @dataclass
 class FullConfig:
     seed: int = 42
-    track_dataset: str = "demo"
+    track_dataset: str = "phalp"
     device: str = "cuda"
     base_tracker: str = "PHALP"
     train: bool = False
