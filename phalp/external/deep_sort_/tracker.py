@@ -57,6 +57,10 @@ class Tracker:
             self.A_dim = dims[0]
             self.P_dim = dims[1]
             self.L_dim = dims[2]
+
+    def set_next_id(self, id):
+        """Manually set the next ID (necessary when resuming from a crashed job)"""
+        self._next_id = id
         
     def predict(self):
         """Propagate track state distributions one time step forward.
