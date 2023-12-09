@@ -175,8 +175,24 @@ class PHALP(nn.Module):
             
             tracked_frames = []
             final_visuals_dic = {}
+
+            # Use and extend frame data from existing pkl file even if overwrite is set.
+            # This is necessary when resuming a multi-hour video tracking job.
+            # The tracking ID numbers should remain continuous, but there will be a 
+            # discontinuity in the tracking computations at the point of resumption.
+            if(os.path.isfile(pkl_path)):
+                print("Existing output file (" + pkl_path + ") found, will reuse available frame data")
+                final_visuals_dic = joblib.load(pkl_path)
+                max_track_id = 0
+                for frame_name in final_visuals_dic:
+                    max_track_id = max([max_track_id] + final_visuals_dic[frame_name]['tid'])
+                print("Starting tracking from tid " + str(max_track_id+1))
+                    tracker.set_next_id(max_track_id+1)
             
             for t_, frame_name in progress_bar(enumerate(list_of_frames), description="Tracking : " + self.cfg.video_seq, total=len(list_of_frames), disable=False):
+
+                if(frame_name in final_visuals_dic):
+                    continue
                 
                 image_frame               = self.io_manager.read_frame(frame_name)
                 img_height, img_width, _  = image_frame.shape
@@ -260,6 +276,9 @@ class PHALP(nn.Module):
                         # delete unnecessary keys
                         for tkey_ in tmp_keys_:  
                             del final_visuals_dic[frame_key][tkey_] 
+
+                if((t_ % self.cfg.dump_interval) == 0):
+                    joblib.dump(final_visuals_dic, pkl_path, compress=3)
 
             joblib.dump(final_visuals_dic, pkl_path, compress=3)
             self.io_manager.close_video()
