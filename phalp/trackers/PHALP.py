@@ -277,7 +277,7 @@ class PHALP(nn.Module):
                         for tkey_ in tmp_keys_:  
                             del final_visuals_dic[frame_key][tkey_] 
 
-                if((t_ % self.cfg.dump_interval) == 0):
+                if((t_ % self.cfg.phalp.dump_interval) == 0):
                     joblib.dump(final_visuals_dic, pkl_path, compress=3)
 
             joblib.dump(final_visuals_dic, pkl_path, compress=3)
