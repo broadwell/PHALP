@@ -187,7 +187,7 @@ class PHALP(nn.Module):
                 for frame_name in final_visuals_dic:
                     max_track_id = max([max_track_id] + final_visuals_dic[frame_name]['tid'])
                 print("Starting tracking from tid " + str(max_track_id+1))
-                    tracker.set_next_id(max_track_id+1)
+                tracker.set_next_id(max_track_id+1)
             
             for t_, frame_name in progress_bar(enumerate(list_of_frames), description="Tracking : " + self.cfg.video_seq, total=len(list_of_frames), disable=False):
 
