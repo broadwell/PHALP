@@ -136,6 +136,7 @@ class HMR2023TextureSampler(HMR2Predictor):
             uv_image[:, :, valid_mask] = img_rgba_at_proj
         except Exception as e:
             print("ERROR pasting image mask, returning None")
+            print(e)
             return None
 
         out = {
