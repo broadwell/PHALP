@@ -40,7 +40,7 @@ class PHALPConfig:
     shot: int = 0
     start_frame: int = -1
     end_frame: int = 10
-    dump_interval: int = 1000
+    dump_interval: int = 10000
 
     small_w: int = 50
     small_h: int = 100
