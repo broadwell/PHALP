@@ -6,7 +6,8 @@ from pathlib import Path
 warnings.filterwarnings('ignore')
 
 import cv2
-import joblib
+#import joblib
+import jsonlines
 import numpy as np
 import torch
 import torch.nn as nn
@@ -153,10 +154,11 @@ class PHALP(nn.Module):
         list_of_frames, additional_data = io_data['list_of_frames'], io_data['additional_data']
         self.cfg.video_seq = io_data['video_name']
         pkl_path = self.cfg.video.output_dir + '/results/' + str(self.cfg.video_seq) + "." + self.cfg.track_dataset + '.pkl'
+        json_path = self.cfg.video.output_dir + '/results/' + str(self.cfg.video_seq) + "." + self.cfg.track_dataset + '.jsonl'
         video_path = self.cfg.video.output_dir + '/' + self.cfg.base_tracker + '_' + str(self.cfg.video_seq) + '.mp4'
         
         # check if the video is already processed                                  
-        if(not(self.cfg.overwrite) and os.path.isfile(pkl_path)): 
+        if(not(self.cfg.overwrite) and os.path.isfile(json_path)): 
             return 0
         
         # eval mode
@@ -176,13 +178,22 @@ class PHALP(nn.Module):
             tracked_frames = []
             final_visuals_dic = {}
 
+            json_writer = jsonlines.open(json_path, mode="w")
+
             # Use and extend frame data from existing pkl file even if overwrite is set.
             # This is necessary when resuming a multi-hour video tracking job.
             # The tracking ID numbers should remain continuous, but there will be a 
             # discontinuity in the tracking computations at the point of resumption.
-            if(os.path.isfile(pkl_path)):
-                print("Existing output file (" + pkl_path + ") found, will reuse available frame data")
-                final_visuals_dic = joblib.load(pkl_path)
+            if(os.path.isfile(json_path)):
+                print("Existing output file (" + json_path + ") found, will reuse available frame data")
+                with jsonlines.open('input.jsonl') as reader:
+                    final_visuals_frames = list(reader)
+                
+                for frameline in final_visuals_frames:
+                    frame_name = frameline[0]
+                    final_visuals_dic[frame_name] = frameline[1]
+                
+                #final_visuals_dic = joblib.load(pkl_path)
                 max_track_id = 0
                 for frame_name in final_visuals_dic:
                     max_track_id = max([max_track_id] + final_visuals_dic[frame_name]['tid'])
@@ -277,8 +288,9 @@ class PHALP(nn.Module):
                         for tkey_ in tmp_keys_:  
                             del final_visuals_dic[frame_key][tkey_] 
 
-                if((t_ % self.cfg.phalp.dump_interval) == 0):
-                    joblib.dump(final_visuals_dic, pkl_path, compress=3)
+                #if((t_ % self.cfg.phalp.dump_interval) == 0):
+                #    joblib.dump(final_visuals_dic, pkl_path, compress=3)
+                json_writer.write([frame_name_, final_visuals_dic[frame_name_]])
 
             joblib.dump(final_visuals_dic, pkl_path, compress=3)
             self.io_manager.close_video()
