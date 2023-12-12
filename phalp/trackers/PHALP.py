@@ -152,7 +152,7 @@ class PHALP(nn.Module):
         io_data = self.io_manager.get_frames_from_source()
         list_of_frames, additional_data = io_data['list_of_frames'], io_data['additional_data']
         self.cfg.video_seq = io_data['video_name']
-        pkl_path = self.cfg.video.output_dir + '/results/' + self.cfg.track_dataset + "_" + str(self.cfg.video_seq) + '.pkl'
+        pkl_path = self.cfg.video.output_dir + '/results/' + str(self.cfg.video_seq) + "." + self.cfg.track_dataset + '.pkl'
         video_path = self.cfg.video.output_dir + '/' + self.cfg.base_tracker + '_' + str(self.cfg.video_seq) + '.mp4'
         
         # check if the video is already processed                                  
