@@ -278,7 +278,8 @@ class PHALP(nn.Module):
                             del final_visuals_dic[frame_key][tkey_] 
 
                 if((t_ % self.cfg.phalp.dump_interval) == 0):
-                    joblib.dump(final_visuals_dic, pkl_path, compress=3)
+                    pkl_chkpt_path = f"{pkl_path}.{t_}"
+                    joblib.dump(final_visuals_dic, pkl_chkpt_path, compress=3)
 
             joblib.dump(final_visuals_dic, pkl_path, compress=3)
             self.io_manager.close_video()
