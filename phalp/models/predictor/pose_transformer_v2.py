@@ -395,7 +395,13 @@ class Pose_transformer_v2(nn.Module):
                 
                 # get the mask
                 has_detection_[p_, t, 0, :] = 1
-            t_end.append(t.item())
+
+            # PMB patch for rare crash due to 
+            # AttributeError: 'int' object has no attribute 'item'
+            if isinstance(t, int):
+                t_end.append(t)
+            else:
+                t_end.append(t.item())
             
         input_data = {
             "pose_shape" : (pose_shape_ - self.mean_[:, :, None, :]) / (self.std_[:, :, None, :] + 1e-10),
