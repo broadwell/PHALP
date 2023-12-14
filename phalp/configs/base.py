@@ -140,6 +140,7 @@ class FullConfig:
     verbose: bool = False
     detect_shots: bool = False
     video_seq: Optional[str] = None
+    video_ext: Optional[str] = None
 
     # Fields
     video: VideoConfig = field(default_factory=VideoConfig)
