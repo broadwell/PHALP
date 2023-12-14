@@ -33,6 +33,7 @@ class IO_Manager():
         if(source_path.startswith("https://") or source_path.startswith("http://")):
 
             video_name = source_path[-11:]
+            video_ext = ".mp4"
             os.makedirs(self.cfg.video.output_dir + "/_DEMO/" + video_name, exist_ok=True)
 
             # if the path is a youtube link, then download the video
@@ -46,6 +47,7 @@ class IO_Manager():
         #if(source_path.endswith(".mp4")):
             # find a proper video name based on the source path
             video_name = source_path.split('/')[-1].split('.')[0]
+            video_ext = source_path.split('.')[-1]
             os.system("rm -rf " + self.cfg.video.output_dir + "/_DEMO/" + video_name + "/img/")
             if(self.cfg.video.extract_video):
                 os.makedirs(self.cfg.video.output_dir + "/_DEMO/" + video_name, exist_ok=True)
@@ -119,6 +121,7 @@ class IO_Manager():
             "list_of_frames": list_of_frames,
             "additional_data": additional_data,
             "video_name": video_name,
+            "video_ext": video_ext,
         }
 
         return io_data
