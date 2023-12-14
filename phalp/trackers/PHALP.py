@@ -1,3 +1,4 @@
+import glob
 import os
 import traceback
 import warnings
@@ -176,13 +177,28 @@ class PHALP(nn.Module):
             tracked_frames = []
             final_visuals_dic = {}
 
-            # Use and extend frame data from existing pkl file even if overwrite is set.
+            # Use and extend frame data from an existing pkl checkpoint file even if overwrite is set.
             # This is necessary when resuming a multi-hour video tracking job.
             # The tracking ID numbers should remain continuous, but there will be a 
             # discontinuity in the tracking computations at the point of resumption.
-            if(os.path.isfile(pkl_path)):
-                print("Existing output file (" + pkl_path + ") found, will reuse available frame data")
-                final_visuals_dic = joblib.load(pkl_path)
+
+            chkpt_to_load = None
+
+            if os.path.isfile(pkl_path):
+                chkpt_to_load = pkl_path
+            else:
+                chkpt_pkl_paths = glob.glob(pkl_path + ".*")
+                latest_chkpt = 0
+
+                for chkpt_path in chkpt_pkl_paths:
+                    chkpt_frame = int(chkpt_path.split('.')[-1])
+                    latest_chkpt = max(latest_chkpt, chkpt_frame)
+                if latest_chkpt > 0:
+                    chkpt_to_load = pkl_path + '.' + str(latest_chkpt)
+
+            if chkpt_to_load is not None:
+                print("Will reuse available frame data from " + chkpt_to_load)
+                final_visuals_dic = joblib.load(chkpt_to_load)
                 max_track_id = 0
                 for frame_name in final_visuals_dic:
                     max_track_id = max([max_track_id] + final_visuals_dic[frame_name]['tid'])
@@ -277,7 +293,7 @@ class PHALP(nn.Module):
                         for tkey_ in tmp_keys_:  
                             del final_visuals_dic[frame_key][tkey_] 
 
-                if((t_ % self.cfg.phalp.dump_interval) == 0):
+                if(((t_ % self.cfg.phalp.dump_interval) == 0) and (t_ > 0)):
                     pkl_chkpt_path = f"{pkl_path}.{t_}"
                     joblib.dump(final_visuals_dic, pkl_chkpt_path, compress=3)
 
