@@ -184,7 +184,7 @@ class PHALP(nn.Module):
 
             chkpt_to_load = None
 
-            if os.path.isfile(pkl_path):
+            if(os.path.isfile(pkl_path)):
                 chkpt_to_load = pkl_path
             else:
                 chkpt_pkl_paths = glob.glob(pkl_path + ".*")
