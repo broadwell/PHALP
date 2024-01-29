@@ -14,7 +14,7 @@ class VideoConfig:
     extract_video: bool = True
     base_path: Optional[str] = None
     start_frame: int = -1
-    end_frame: int = 1300
+    end_frame: int = -1 
     useffmpeg: bool = False
 
     # this will be used if extract_video=False
