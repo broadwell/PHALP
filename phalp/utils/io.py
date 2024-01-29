@@ -44,7 +44,6 @@ class IO_Manager():
             source_path = self.cfg.video.output_dir + "/_DEMO/" + video_name + "/youtube.mp4"
 
         if(source_path.endswith((".mp4", ".mkv"))):
-        #if(source_path.endswith(".mp4")):
             # find a proper video name based on the source path
             video_name = source_path.split('/')[-1].split('.')[0]
             video_ext = source_path.split('.')[-1]
@@ -56,7 +55,6 @@ class IO_Manager():
                 fe = FrameExtractor(source_path)
                 log.info('Number of frames: ' + str(fe.n_frames))
                 last_frame = max(fe.n_frames, self.cfg.video.end_frame)
-
                 fe.extract_frames(every_x_frame=1, img_name='', dest_path= self.cfg.video.output_dir + "/_DEMO/" + video_name + "/img/", start_frame=self.cfg.video.start_frame, end_frame=last_frame)
                 list_of_frames = sorted(glob.glob(self.cfg.video.output_dir + "/_DEMO/" + video_name + "/img/*.jpg"))
             else:
