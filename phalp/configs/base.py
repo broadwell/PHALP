@@ -16,6 +16,7 @@ class VideoConfig:
     start_frame: int = -1
     end_frame: int = -1 
     useffmpeg: bool = False
+    vis_results: bool = True # False = inference only, no vis
 
     # this will be used if extract_video=False
     start_time: str = '0s'
@@ -39,6 +40,7 @@ class PHALPConfig:
     shot: int = 0
     start_frame: int = -1
     end_frame: int = 10
+    dump_interval: int = 10000
 
     small_w: int = 50
     small_h: int = 100
@@ -61,7 +63,7 @@ class HMRConfig:
 
 @dataclass
 class RenderConfig:
-    enable: bool = True
+    enable: bool = True # for inference only, no viz
     type: str = 'HUMAN_MESH' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
     up_scale: int = 2
     res: int = 256
@@ -126,7 +128,7 @@ class ExtraConfig:
 @dataclass
 class FullConfig:
     seed: int = 42
-    track_dataset: str = "demo"
+    track_dataset: str = "phalp"
     device: str = "cuda"
     base_tracker: str = "PHALP"
     train: bool = False
@@ -138,6 +140,7 @@ class FullConfig:
     verbose: bool = False
     detect_shots: bool = False
     video_seq: Optional[str] = None
+    video_ext: Optional[str] = None
 
     # Fields
     video: VideoConfig = field(default_factory=VideoConfig)

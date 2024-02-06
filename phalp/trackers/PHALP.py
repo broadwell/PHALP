@@ -1,3 +1,4 @@
+import glob
 import os
 import traceback
 import warnings
@@ -57,7 +58,7 @@ class PHALP(nn.Module):
         
         # setup Detectron2, override this function to use your own model
         self.setup_detectron2()
-        
+       
         # create a visualizer
         self.setup_visualizer()
         
@@ -152,13 +153,14 @@ class PHALP(nn.Module):
         io_data = self.io_manager.get_frames_from_source()
         list_of_frames, additional_data = io_data['list_of_frames'], io_data['additional_data']
         self.cfg.video_seq = io_data['video_name']
-        pkl_path = self.cfg.video.output_dir + '/results/' + self.cfg.track_dataset + "_" + str(self.cfg.video_seq) + '.pkl'
-        video_path = self.cfg.video.output_dir + '/' + self.cfg.base_tracker + '_' + str(self.cfg.video_seq) + '.mp4'
+        self.cfg.video_ext = io_data['video_ext']
+        pkl_path = self.cfg.video.output_dir + '/results/' + str(self.cfg.video_seq) + '.' + self.cfg.video_ext + '.' + self.cfg.track_dataset + '.pkl'
+        video_path = self.cfg.video.output_dir + '/' + self.cfg.base_tracker + '_' + str(self.cfg.video_seq) + '.' + self.cfg.video_ext
         
-        # check if the video is already processed                                  
-        if(not(self.cfg.overwrite) and os.path.isfile(pkl_path)): 
+        # check if the video is already processed
+        if(not(self.cfg.overwrite) and os.path.isfile(pkl_path)):
             return 0
-        
+
         # eval mode
         self.eval()
         
@@ -175,8 +177,39 @@ class PHALP(nn.Module):
             
             tracked_frames = []
             final_visuals_dic = {}
+
+            # Use and extend frame data from an existing pkl checkpoint file even if overwrite is set.
+            # This is necessary when resuming a multi-hour video tracking job.
+            # The tracking ID numbers should remain continuous, but there will be a 
+            # discontinuity in the tracking computations at the point of resumption.
+
+            chkpt_to_load = None
+
+            if(os.path.isfile(pkl_path)):
+                chkpt_to_load = pkl_path
+            else:
+                chkpt_pkl_paths = glob.glob(pkl_path + ".*")
+                latest_chkpt = 0
+
+                for chkpt_path in chkpt_pkl_paths:
+                    chkpt_frame = int(chkpt_path.split('.')[-1])
+                    latest_chkpt = max(latest_chkpt, chkpt_frame)
+                if latest_chkpt > 0:
+                    chkpt_to_load = pkl_path + '.' + str(latest_chkpt)
+
+            if chkpt_to_load is not None:
+                print("Will reuse available frame data from " + chkpt_to_load)
+                final_visuals_dic = joblib.load(chkpt_to_load)
+                max_track_id = 0
+                for frame_name in final_visuals_dic:
+                    max_track_id = max([max_track_id] + final_visuals_dic[frame_name]['tid'])
+                print("Starting tracking from tid " + str(max_track_id+1))
+                self.tracker.set_next_id(max_track_id+1)
             
             for t_, frame_name in progress_bar(enumerate(list_of_frames), description="Tracking : " + self.cfg.video_seq, total=len(list_of_frames), disable=False):
+
+                if(frame_name in final_visuals_dic):
+                    continue
                 
                 image_frame               = self.io_manager.read_frame(frame_name)
                 img_height, img_width, _  = image_frame.shape
@@ -260,6 +293,10 @@ class PHALP(nn.Module):
                         # delete unnecessary keys
                         for tkey_ in tmp_keys_:  
                             del final_visuals_dic[frame_key][tkey_] 
+
+                if(((t_ % self.cfg.phalp.dump_interval) == 0) and (t_ > 0)):
+                    pkl_chkpt_path = f"{pkl_path}.{t_}"
+                    joblib.dump(final_visuals_dic, pkl_chkpt_path, compress=3)
 
             joblib.dump(final_visuals_dic, pkl_path, compress=3)
             self.io_manager.close_video()
