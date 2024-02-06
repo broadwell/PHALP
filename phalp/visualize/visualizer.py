@@ -78,15 +78,12 @@ phalp_to_coco_17 = [
 ]
 
 
-def merge_coords(all_coords, guide_to_merge, has_confidence=False):
+def merge_coords(all_coords, guide_to_merge):
     new_coords = []
     for to_merge in guide_to_merge:
         x_avg = sum([all_coords[i][0] for i in to_merge]) / len(to_merge)
         y_avg = sum([all_coords[i][1] for i in to_merge]) / len(to_merge)
-        conf = 1.0
-        if has_confidence:
-            conf = sum([all_coords[i][2] for i in to_merge]) / len(to_merge)
-        new_coords.append([x_avg, y_avg, conf])
+        new_coords.append([x_avg, y_avg])
 
     return np.array(new_coords)
 
@@ -215,19 +212,19 @@ class Visualizer(nn.Module):
         joints_2d *= img_size
         joints_2d[:, 1] -= (max(img_width, img_height) - min(img_width, img_height)) / 2
 
-        coco17_joints = merge_coords(joints_2d, phalp_to_coco_17).flatten()
+        coco17_joints = merge_coords(joints_2d, phalp_to_coco_17)
 
         for i, seg in enumerate(COCO_17_SKELETON):
             line_color = ImageColor.getrgb(COCO_COLORS[i])
 
             pt1 = (
-                coco17_joints[seg[0] - 1][0],
-                coco17_joints[seg[0] - 1][1],
+                round(coco17_joints[seg[0] - 1][0]),
+                round(coco17_joints[seg[0] - 1][1]),
             )
 
             pt2 = (
-                coco17_joints[seg[1] - 1][0],
-                coco17_joints[seg[1] - 1][1],
+                round(coco17_joints[seg[1] - 1][0]),
+                round(coco17_joints[seg[1] - 1][1]),
             )
 
             cv2.line(cv_image, pt1, pt2, line_color, thickness=2)
