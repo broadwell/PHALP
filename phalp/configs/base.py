@@ -63,7 +63,7 @@ class HMRConfig:
 
 @dataclass
 class RenderConfig:
-    enable: bool = True # Set to False for inference only, no viz
+    enable: bool = False # Set to False for inference only, no viz
     type: str = 'HUMAN_MESH' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
     up_scale: int = 2
     res: int = 256
