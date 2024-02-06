@@ -78,15 +78,12 @@ phalp_to_coco_17 = [
 ]
 
 
-def merge_coords(all_coords, guide_to_merge, has_confidence=False):
+def merge_coords(all_coords, guide_to_merge):
     new_coords = []
     for to_merge in guide_to_merge:
         x_avg = sum([all_coords[i][0] for i in to_merge]) / len(to_merge)
         y_avg = sum([all_coords[i][1] for i in to_merge]) / len(to_merge)
-        conf = 1.0
-        if has_confidence:
-            conf = sum([all_coords[i][2] for i in to_merge]) / len(to_merge)
-        new_coords.append([x_avg, y_avg, conf])
+        new_coords.append([x_avg, y_avg])
 
     return np.array(new_coords)
 
