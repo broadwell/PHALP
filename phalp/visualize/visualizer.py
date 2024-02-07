@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from PIL import Image
+from PIL import Image, ImageColor
 from pycocotools import mask as mask_utils
 from torch.utils.data._utils.collate import default_collate
 from torchvision.utils import make_grid
@@ -14,6 +14,80 @@ from phalp.utils.utils import (get_colors, numpy_to_torch_image,
                                perspective_projection)
 from phalp.visualize.py_renderer import Renderer
 
+
+COCO_17_SKELETON = [
+    (16, 14),
+    (14, 12),
+    (17, 15),
+    (15, 13),
+    (12, 13),
+    (6, 12),
+    (7, 13),
+    (6, 7),
+    (6, 8),
+    (7, 9),
+    (8, 10),
+    (9, 11),
+    (2, 3),
+    (1, 2),
+    (1, 3),
+    (2, 4),
+    (3, 5),
+    (4, 6),
+    (5, 7),
+]
+
+COCO_COLORS = [
+    "orangered",
+    "orange",
+    "blue",
+    "lightblue",
+    "darkgreen",
+    "red",
+    "lightgreen",
+    "pink",
+    "plum",
+    "purple",
+    "brown",
+    "saddlebrown",
+    "mediumorchid",
+    "gray",
+    "salmon",
+    "chartreuse",
+    "lightgray",
+    "darkturquoise",
+    "goldenrod",
+]
+
+phalp_to_coco_17 = [
+    [0],
+    [16],
+    [15],
+    [18],
+    [17],
+    [5, 34],
+    [2, 33],
+    [6, 35],
+    [3, 32],
+    [7, 36],
+    [4, 31],
+    [28],
+    [27],
+    [13, 29],
+    [10, 26],
+    [14, 30],
+    [11, 25],
+]
+
+
+def merge_coords(all_coords, guide_to_merge):
+    new_coords = []
+    for to_merge in guide_to_merge:
+        x_avg = sum([all_coords[i][0] for i in to_merge]) / len(to_merge)
+        y_avg = sum([all_coords[i][1] for i in to_merge]) / len(to_merge)
+        new_coords.append([x_avg, y_avg])
+
+    return np.array(new_coords)
 
 def rect_with_opacity(image, top_left, bottom_right, fill_color, fill_opacity):
     with_fill = image.copy()
@@ -98,6 +172,34 @@ class Visualizer(nn.Module):
 
         return image
 
+    def visualize_armatures(self, cv_image, pred_joints_2d):
+        joints_2d = copy.deepcopy(pred_joints_2d)
+
+        img_height, img_width, _ = cv_image.shape
+        img_size = max(img_height, img_width)
+        joints_2d = joints_2d.reshape(-1, 2)
+        joints_2d *= img_size
+        joints_2d[:, 1] -= (max(img_width, img_height) - min(img_width, img_height)) / 2
+
+        coco17_joints = merge_coords(joints_2d, phalp_to_coco_17)
+
+        for i, seg in enumerate(COCO_17_SKELETON):
+            line_color = ImageColor.getrgb(COCO_COLORS[i])
+
+            pt1 = (
+                round(coco17_joints[seg[0] - 1][0]),
+                round(coco17_joints[seg[0] - 1][1]),
+            )
+
+            pt2 = (
+                round(coco17_joints[seg[1] - 1][0]),
+                round(coco17_joints[seg[1] - 1][1]),
+            )
+
+            cv2.line(cv_image, pt1, pt2, line_color, thickness=2)
+
+        return cv_image
+
     def visualize_mask(self, image, mask, bbox, color, text, 
                  alpha=0.5, show_border=True, border_alpha=0.8, 
                  border_thick=2, border_color=None):
@@ -118,6 +220,7 @@ class Visualizer(nn.Module):
         if ("MASK" in self.cfg.render.type):
             image[idx[0], idx[1], :] *= 1.0 - alpha
             image[idx[0], idx[1], :] += [alpha * x for x in cv_color]
+            seg_joints_2d = joints_2d[ids_x]
             
             if border_alpha == 0:
                 return
@@ -284,6 +387,7 @@ class Visualizer(nn.Module):
         
         tracked_mask = final_visuals_dic["mask"]
         tracked_bbox = final_visuals_dic["bbox"]
+        joints_2d = final_visuals_dic["2d_joints"]
         
         tracked_smpl = final_visuals_dic["smpl"]
         tracked_cameras = final_visuals_dic["camera"]    
@@ -377,6 +481,7 @@ class Visualizer(nn.Module):
                 if "MASK" in self.cfg.render.type or "BBOX" in self.cfg.render.type:
                     seg_mask = tracked_mask[ids_x]
                     seg_bbox = tracked_bbox[ids_x]
+                    seg_joints_2d = joints_2d[ids_x]
                     for i, tr in enumerate(tracked_ids_x):
                         seg_mask_ = mask_utils.decode(seg_mask[i][0])
                         seg_bbox_ = seg_bbox[i]
@@ -384,6 +489,9 @@ class Visualizer(nn.Module):
                                                        color=np.array(self.colors[tr]), 
                                                        text="track id : " + str(tr)
                                                        )
+                        seg_joints_2d_ = seg_joints_2d[i]
+                        cv_image = self.visualize_armatures(cv_image, seg_joints_2d_)
+
                     rendered_image_final = numpy_to_torch_image(np.array(cv_image)/255.)
             else:
                 rendered_image_final = copy.deepcopy(image_resized_rgb)
