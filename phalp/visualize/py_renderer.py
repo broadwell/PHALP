@@ -150,8 +150,11 @@ class Renderer:
         color = color.astype(np.float32) / 255.0
       
 	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
-        # See https://github.com/mmatl/pyrender/issues/148 
-        self.__del__()
+        # See https://github.com/mmatl/pyrender/issues/148
+        try:
+            self.__del__()
+        except Exception as _:
+            pass
  
         return color
 
