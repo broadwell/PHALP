@@ -149,7 +149,7 @@ class Renderer:
         color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
         color = color.astype(np.float32) / 255.0
       
-	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
+	    # PMB XXX Might need to do this to avoid spurious OpenGL errors?
         # See https://github.com/mmatl/pyrender/issues/148
         try:
             self.__del__()
