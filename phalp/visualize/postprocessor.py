@@ -13,6 +13,7 @@ from phalp.utils.utils_tracks import create_fast_tracklets, get_tracks
 from phalp.utils.utils import pose_camera_vector_to_smpl
 from phalp.utils.lart_utils import to_ava_labels
 
+CHECKPOINT_INTERVAL = 100 # in tracks
 
 class Postprocessor(nn.Module):
     
@@ -23,13 +24,19 @@ class Postprocessor(nn.Module):
         self.device = 'cuda'
         self.phalp_tracker = phalp_tracker
 
-    def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name=""):
+    def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name="", checkpoint_end=0):
 
         if(self.cfg.post_process.apply_smoothing):
             final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
+            print("Loading tracks")
             track_dict = get_tracks(final_visuals_dic_)
 
-            for tid_ in track_dict.keys():
+            print("Total # of tracks:", len(list(track_dict.keys())))
+            for t, tid_ in enumerate(track_dict.keys()):
+                if t < checkpoint_end:
+                    continue
+
+                print("Working on track", tid_)
                 fast_track_ = create_fast_tracklets(track_dict[tid_])
             
                 with torch.no_grad():
@@ -79,27 +86,38 @@ class Postprocessor(nn.Module):
                         ava_labels, _ = to_ava_labels(ava_, self.cfg)
                         final_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
                         final_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
-                        
-        
+
+                if((t > 0) and (t % CHECKPOINT_INTERVAL == 0)):
+                    chkpt_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl." + str(t))
+                    joblib.dump(final_visuals_dic, chkpt_path)
+
         return final_visuals_dic
 
     def run_lart(self, phalp_pkl_path):
         
         # lart_output = {}
-        video_pkl_name = phalp_pkl_path.split("/")[-1].split(".")[0]
+        print("PHALP running LART on pkl file", phalp_pkl_path)
+        video_pkl_fn = phalp_pkl_path.split("/")[-1]
+        if(video_pkl_fn.split(".")[-1].isnumeric()):
+            video_pkl_name = ".".join(phalp_pkl_path.split("/")[-1].split(".")[:-1]).replace(".pkl", "").replace(".lart", "")
+            checkpoint_end = int(video_pkl_fn.split(".")[-1])
+            print("Restarting from checkpoint at track count", checkpoint_end)
+        else:
+            video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
+
         final_visuals_dic = joblib.load(phalp_pkl_path)
 
         os.makedirs(self.cfg.video.output_dir + "/results_temporal/", exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_videos/", exist_ok=True)
-        save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".pkl")
+        save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl")
         save_video_path = os.path.join(self.cfg.video.output_dir, "results_temporal_videos/", video_pkl_name + "_.mp4")
 
         if(os.path.exists(save_pkl_path) and not(self.cfg.overwrite)):
             return 0
         
         # apply smoothing/action recognition etc.
-        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name)
+        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name, checkpoint_end=checkpoint_end)
         
         # render the video
         if(self.cfg.render.enable):
