@@ -14,7 +14,7 @@ class VideoConfig:
     extract_video: bool = True
     base_path: Optional[str] = None
     start_frame: int = -1
-    end_frame: int = -1
+    end_frame: int = -1 
     useffmpeg: bool = False
     vis_results: bool = True # False = inference only, no vis
 
