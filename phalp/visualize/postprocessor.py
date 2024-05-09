@@ -104,6 +104,7 @@ class Postprocessor(nn.Module):
             print("Restarting from checkpoint at track count", checkpoint_end)
         else:
             video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
+            checkpoint_end = 0
 
         final_visuals_dic = joblib.load(phalp_pkl_path)
 
