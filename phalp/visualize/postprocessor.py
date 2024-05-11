@@ -44,7 +44,7 @@ class Postprocessor(nn.Module):
 
             print("Total # of tracks:", len(list(track_dict.keys())))
             
-            for t, tid_ in enumerate(track_dict.keys()):
+            for t, tid_ in enumerate(sorted(track_dict.keys())):
                 if t < checkpoint_end:
                     continue
 
