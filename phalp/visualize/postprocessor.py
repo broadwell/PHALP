@@ -1,5 +1,6 @@
 import copy
 
+import glob
 import os
 import cv2
 import joblib
@@ -26,12 +27,23 @@ class Postprocessor(nn.Module):
 
     def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name="", checkpoint_end=0):
 
+        print("In post_process")
         if(self.cfg.post_process.apply_smoothing):
+            print("Copying final visuals dictionary")
             final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
             print("Loading tracks")
-            track_dict = get_tracks(final_visuals_dic_)
+            #track_dict = get_tracks(final_visuals_dic_)
+            cache_dir = self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name + "/"
+            get_tracks(final_visuals_dic_, cache_dir=cache_dir)
+            
+            track_dict = {}
+            for track_fn in glob.glob(cache_dir + "*.pkl"):
+                tid = int(track_fn.split("/")[-1].replace(".pkl", ""))
+                print("Loading cached track frames for", tid)
+                track_dict[tid] = joblib.load(track_fn)
 
             print("Total # of tracks:", len(list(track_dict.keys())))
+            
             for t, tid_ in enumerate(track_dict.keys()):
                 if t < checkpoint_end:
                     continue
@@ -106,8 +118,11 @@ class Postprocessor(nn.Module):
             video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
             checkpoint_end = 0
 
+        print("Loading PHALP .pkl file")
         final_visuals_dic = joblib.load(phalp_pkl_path)
 
+        # PMB For caching LART track data rather than keeping it in memory
+        os.makedirs(self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name, exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal/", exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_videos/", exist_ok=True)
