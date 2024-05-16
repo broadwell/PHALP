@@ -1,18 +1,23 @@
-import warnings
+import joblib
 import numpy as np
+import warnings
 
 warnings.filterwarnings("ignore")
 
-def get_tracks(phalp_tracks):
+def get_tracks(phalp_tracks, cache_dir=None):
 
     tracks_ids     = []
     tracks_dict    = {}
+    print("Getting track IDs")
     for frame_ in phalp_tracks: tracks_ids += phalp_tracks[frame_]['tracked_ids']
 
     tracks_ids = list(set(tracks_ids))
+    print("Total track IDs:", len(tracks_ids))
     
     for track_id in tracks_ids:
+        print("Looping through frames for track", track_id)
         tracks_dict[track_id] = {}
+        track_dict = {}
         list_valid_frames     = []
         list_frame_names      = []
         for fid, frame_name in enumerate(phalp_tracks.keys()):
@@ -41,9 +46,11 @@ def get_tracks(phalp_tracks):
                     'fid'           : fid,
                     'frame_path'    : phalp_tracks[frame_name]['frame_path'],
                 }
-                
-            
-                tracks_dict[track_id][frame_name] = track_results
+               
+                if cache_dir: 
+                    track_dict[frame_name] = track_results
+                else:
+                    tracks_dict[track_id][frame_name] = track_results
                 list_valid_frames.append(1)
             else:
                 track_results = {
@@ -56,11 +63,15 @@ def get_tracks(phalp_tracks):
                     'size'          : None,
                     'frame_path'    : phalp_tracks[frame_name]['frame_path'],
                 }
-                tracks_dict[track_id][frame_name] = track_results
+                if cache_dir:
+                    track_dict[frame_name] = track_results
+                else:
+                    tracks_dict[track_id][frame_name] = track_results
                 list_valid_frames.append(0)
             
             list_frame_names.append(frame_name)
-        
+       
+        print("Cleaning up tracks_dict") 
         list_valid_frames2 = np.array(list_valid_frames)
         loc_ = np.where(list_valid_frames2==1)
         s_ = np.min(loc_)
@@ -68,13 +79,21 @@ def get_tracks(phalp_tracks):
 
         for i, fname in enumerate(list_frame_names):
             if(i<s_ or i>e_):
-                del tracks_dict[track_id][fname]
+                if cache_dir:
+                    del track_dict[fname]
+                else:
+                    del tracks_dict[track_id][fname]
+
+        if cache_dir:
+            print("Total frames for track", track_id, len(list(track_dict.keys())))
+            joblib.dump(track_dict, cache_dir + str(track_id) + ".pkl")
 
     return tracks_dict
 
 
 
 def create_fast_tracklets(data):
+    print("Creating fast tracklets")
     list_of_frames = list(data.keys())
     frame_length   = len(list_of_frames)
     
