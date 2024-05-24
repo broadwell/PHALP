@@ -14,7 +14,7 @@ from phalp.utils.utils_tracks import create_fast_tracklets, get_tracks
 from phalp.utils.utils import pose_camera_vector_to_smpl
 from phalp.utils.lart_utils import to_ava_labels
 
-CHECKPOINT_INTERVAL = 100 # in tracks
+CHECKPOINT_INTERVAL = 10 # in tracks
 
 class Postprocessor(nn.Module):
     
@@ -46,6 +46,7 @@ class Postprocessor(nn.Module):
             
             for t, tid_ in enumerate(sorted(track_dict.keys())):
                 if t < checkpoint_end:
+                    print("Skipping checkpointed track", tid_)
                     continue
 
                 print("Working on track", tid_)
@@ -119,6 +120,8 @@ class Postprocessor(nn.Module):
             checkpoint_end = 0
 
         print("Loading PHALP .pkl file")
+        # XXX Might be better to make this RAM-bound, not VRAM-bound
+        #torch.serialization.register_package(0, lambda x: x.device.type, lambda x, _: x.cpu())
         final_visuals_dic = joblib.load(phalp_pkl_path)
 
         # PMB For caching LART track data rather than keeping it in memory
