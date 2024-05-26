@@ -1,4 +1,6 @@
 import joblib
+import os
+
 import numpy as np
 import warnings
 
@@ -15,6 +17,10 @@ def get_tracks(phalp_tracks, cache_dir=None):
     print("Total track IDs:", len(tracks_ids))
     
     for track_id in tracks_ids:
+        if cache_dir and os.path.isfile(cache_dir + str(track_id) + ".pkl"):
+            print("Individual track cache file already exists, skipping track", track_id)
+            continue
+
         print("Looping through frames for track", track_id)
         tracks_dict[track_id] = {}
         track_dict = {}
@@ -88,6 +94,7 @@ def get_tracks(phalp_tracks, cache_dir=None):
             print("Total frames for track", track_id, len(list(track_dict.keys())))
             joblib.dump(track_dict, cache_dir + str(track_id) + ".pkl")
 
+    # Will be ignored when working from cache files
     return tracks_dict
 
 
