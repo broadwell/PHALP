@@ -53,8 +53,8 @@ class Postprocessor(nn.Module):
                 #     print("Skipping checkpointed track", tid_)
                 #     continue
 
-                glob_matches = glob.glob(f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}/{tid_}_*_.pkl")
-                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
+                glob_matches = glob.glob(f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*_.pkl")
+                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
                 if len(glob_matches) == 1:
                     print("Loading cached smoothed fast track from", glob_matches[0])
                     smoothed_fast_track_ = joblib.load(glob_matches[0])
@@ -127,7 +127,7 @@ class Postprocessor(nn.Module):
         #return final_visuals_dic
         return slim_visuals_dic
 
-    def run_lart(self, phalp_pkl_path):
+    def run_lart(self, phalp_pkl_path, save_fast_tracks=False):
         
         # lart_output = {}
         print("running LART on PHALP pkl file", phalp_pkl_path)
@@ -140,6 +140,8 @@ class Postprocessor(nn.Module):
         video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
         # Probably not doing checkpoints this way anymore
         # checkpoint_end = 0
+
+        self.cfg.post_process.save_fast_tracks = save_fast_tracks
 
         print("Loading PHALP .pkl file")
         # XXX Might be better to make this RAM-bound, not VRAM-bound
