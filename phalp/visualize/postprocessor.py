@@ -14,7 +14,7 @@ from phalp.utils.utils_tracks import create_fast_tracklets, get_tracks
 from phalp.utils.utils import pose_camera_vector_to_smpl
 from phalp.utils.lart_utils import to_ava_labels
 
-CHECKPOINT_INTERVAL = 10 # in tracks
+# CHECKPOINT_INTERVAL = 10 # in tracks
 
 class Postprocessor(nn.Module):
     
@@ -25,7 +25,7 @@ class Postprocessor(nn.Module):
         self.device = 'cuda'
         self.phalp_tracker = phalp_tracker
 
-    def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name="", checkpoint_end=0):
+    def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name=""):
 
         print("In post_process")
         if(self.cfg.post_process.apply_smoothing):
@@ -53,8 +53,8 @@ class Postprocessor(nn.Module):
                 #     print("Skipping checkpointed track", tid_)
                 #     continue
 
-                glob_matches = glob.glob(f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}_{tid_}_*_.pkl")
-                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}_{tid_}_*.pkl")
+                glob_matches = glob.glob(f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}/{tid_}_*_.pkl")
+                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
                 if len(glob_matches) == 1:
                     print("Loading cached smoothed fast track from", glob_matches[0])
                     smoothed_fast_track_ = joblib.load(glob_matches[0])
@@ -80,7 +80,7 @@ class Postprocessor(nn.Module):
                     smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
 
                     # save the fast tracks in a pkl file
-                    save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal_fast/", video_pkl_name + "_" + str(tid_) +  "_" + str(frame_length) + ".pkl")
+                    save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal_fast/", video_pkl_name, str(tid_) +  "_" + str(frame_length) + ".pkl")
                     joblib.dump(smoothed_fast_track_, save_pkl_path)
 
                 for i_ in range(smoothed_fast_track_['pose_shape'].shape[0]):
@@ -131,7 +131,7 @@ class Postprocessor(nn.Module):
         
         # lart_output = {}
         print("running LART on PHALP pkl file", phalp_pkl_path)
-        video_pkl_fn = phalp_pkl_path.split("/")[-1]
+        # video_pkl_fn = phalp_pkl_path.split("/")[-1]
         # if(video_pkl_fn.split(".")[-1].isnumeric()):
         #     video_pkl_name = ".".join(phalp_pkl_path.split("/")[-1].split(".")[:-1]).replace(".pkl", "").replace(".lart", "")
         #     checkpoint_end = int(video_pkl_fn.split(".")[-1])
@@ -139,7 +139,7 @@ class Postprocessor(nn.Module):
         # else:
         video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
         # Probably not doing checkpoints this way anymore
-        checkpoint_end = 0
+        # checkpoint_end = 0
 
         print("Loading PHALP .pkl file")
         # XXX Might be better to make this RAM-bound, not VRAM-bound
@@ -149,7 +149,8 @@ class Postprocessor(nn.Module):
         # PMB For caching LART track data rather than keeping it in memory
         os.makedirs(self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name, exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal/", exist_ok=True)
-        os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
+        #os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
+        os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/" + video_pkl_name, exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_videos/", exist_ok=True)
         save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl")
         save_video_path = os.path.join(self.cfg.video.output_dir, "results_temporal_videos/", video_pkl_name + "_.mp4")
@@ -158,7 +159,7 @@ class Postprocessor(nn.Module):
             return 0
         
         # apply smoothing/action recognition etc.
-        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name, checkpoint_end=checkpoint_end)
+        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name)
         
         # render the video
         # NOTE - can't be rendered from the "slim" final_visuals_dic
