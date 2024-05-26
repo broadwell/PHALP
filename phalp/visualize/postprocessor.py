@@ -30,11 +30,15 @@ class Postprocessor(nn.Module):
         print("In post_process")
         if(self.cfg.post_process.apply_smoothing):
             print("Copying final visuals dictionary")
-            final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
+            # This seems to only be used to flag whether a track has already been processed,
+            # so there must be a more efficient way to manage it here
+            #final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
+            tracked_times = {} # This will keep track of whether a track has been processed
+            slim_visuals_dic = {} # Similarly, we don't have to save the values that are dupliated in the PHALP output
             print("Loading tracks")
             #track_dict = get_tracks(final_visuals_dic_)
             cache_dir = self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name + "/"
-            get_tracks(final_visuals_dic_, cache_dir=cache_dir)
+            get_tracks(final_visuals_dic, cache_dir=cache_dir)
             
             track_dict = {}
             for track_fn in glob.glob(cache_dir + "*.pkl"):
@@ -45,18 +49,26 @@ class Postprocessor(nn.Module):
             print("Total # of tracks:", len(list(track_dict.keys())))
             
             for t, tid_ in enumerate(sorted(track_dict.keys())):
-                if t < checkpoint_end:
-                    print("Skipping checkpointed track", tid_)
-                    continue
+                # if t < checkpoint_end:
+                #     print("Skipping checkpointed track", tid_)
+                #     continue
 
-                print("Working on track", tid_)
-                fast_track_ = create_fast_tracklets(track_dict[tid_])
+                glob_matches = glob.glob(f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}_{tid_}_*_.pkl")
+                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}/results_temporal_fast/{video_pkl_name}_{tid_}_*.pkl")
+                if len(glob_matches) == 1:
+                    print("Loading cached smoothed fast track from", glob_matches[0])
+                    smoothed_fast_track_ = joblib.load(glob_matches[0])
+                else:
+                    print("No single match found, creating fast tracklets for", tid_)
+                    fast_track_ = create_fast_tracklets(track_dict[tid_])
             
-                with torch.no_grad():
-                    smoothed_fast_track_ = self.phalp_tracker.pose_predictor.smooth_tracks(fast_track_, moving_window=True, step=32, window=32)
+                    print("Smoothing fast track for", tid_)
+                    with torch.no_grad():
+                        smoothed_fast_track_ = self.phalp_tracker.pose_predictor.smooth_tracks(fast_track_, moving_window=True, step=32, window=32)
 
                 if(save_fast_tracks):
                     frame_length = len(smoothed_fast_track_['frame_name'])
+                    print("Saving fast track for", tid, "length in frames", frame_length)
                     dict_ava_feat = {}
                     dict_ava_psudo_labels = {}
                     for idx, appe_idx in enumerate(smoothed_fast_track_['apperance_index']):
@@ -73,7 +85,8 @@ class Postprocessor(nn.Module):
 
                 for i_ in range(smoothed_fast_track_['pose_shape'].shape[0]):
                     f_key = smoothed_fast_track_['frame_name'][i_]
-                    tids_ = np.array(final_visuals_dic_[f_key]['tid'])
+                    tids_ = np.array(final_visuals_dic[f_key]['tid'])
+                    #tids_ = np.array(final_visuals_dic_[f_key]['tid'])
                     idx_  = np.where(tids_==tid_)[0]
                     
                     if(len(idx_)>0):
@@ -88,36 +101,45 @@ class Postprocessor(nn.Module):
                         for k, v in smpl_.items():
                             dict_[k] = v
 
-                        if(final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0):
-                            final_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
-                            final_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
-                            final_visuals_dic[f_key]['tracked_time'][idx_[0]] = -1
+                        slim_visuals_dic[f_key] = {'camera': {}, 'smpl': {}, 'label': {}, 'ava_action': {}}
+
+                        if((final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0) and not (f_key in tracked_times and idx_[0] in tracked_times[f_key][idx_[0]])):
+                            #final_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
+                            #final_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
+                            slim_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
+                            slim_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
+                            tracked_times.setdefault(f_key, {})[idx_[0]] = -1
+                            #final_visuals_dic[f_key]['tracked_time'][idx_[0]] = -1
                         
                         # attach ava labels
                         ava_ = smoothed_fast_track_['ava_action'][i_]
                         ava_ = ava_.cpu()
                         ava_labels, _ = to_ava_labels(ava_, self.cfg)
-                        final_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
-                        final_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
+                        #final_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
+                        #final_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
+                        slim_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
+                        slim_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
 
-                if((t > 0) and (t % CHECKPOINT_INTERVAL == 0)):
-                    chkpt_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl." + str(t))
-                    joblib.dump(final_visuals_dic, chkpt_path)
+                # if((t > 0) and (t % CHECKPOINT_INTERVAL == 0)):
+                #     chkpt_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl." + str(t))
+                #     joblib.dump(final_visuals_dic, chkpt_path)
 
-        return final_visuals_dic
+        #return final_visuals_dic
+        return slim_visuals_dic
 
     def run_lart(self, phalp_pkl_path):
         
         # lart_output = {}
-        print("PHALP running LART on pkl file", phalp_pkl_path)
+        print("running LART on PHALP pkl file", phalp_pkl_path)
         video_pkl_fn = phalp_pkl_path.split("/")[-1]
-        if(video_pkl_fn.split(".")[-1].isnumeric()):
-            video_pkl_name = ".".join(phalp_pkl_path.split("/")[-1].split(".")[:-1]).replace(".pkl", "").replace(".lart", "")
-            checkpoint_end = int(video_pkl_fn.split(".")[-1])
-            print("Restarting from checkpoint at track count", checkpoint_end)
-        else:
-            video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
-            checkpoint_end = 0
+        # if(video_pkl_fn.split(".")[-1].isnumeric()):
+        #     video_pkl_name = ".".join(phalp_pkl_path.split("/")[-1].split(".")[:-1]).replace(".pkl", "").replace(".lart", "")
+        #     checkpoint_end = int(video_pkl_fn.split(".")[-1])
+        #     print("Restarting from checkpoint at track count", checkpoint_end)
+        # else:
+        video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
+        # Probably not doing checkpoints this way anymore
+        checkpoint_end = 0
 
         print("Loading PHALP .pkl file")
         # XXX Might be better to make this RAM-bound, not VRAM-bound
@@ -139,6 +161,7 @@ class Postprocessor(nn.Module):
         final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name, checkpoint_end=checkpoint_end)
         
         # render the video
+        # NOTE - can't be rendered from the "slim" final_visuals_dic
         if(self.cfg.render.enable):
             self.offline_render(final_visuals_dic, save_pkl_path, save_video_path)
         
