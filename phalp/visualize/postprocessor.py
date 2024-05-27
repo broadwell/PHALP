@@ -48,12 +48,12 @@ class Postprocessor(nn.Module):
 
             print("Total # of tracks:", len(list(track_dict.keys())))
             
-            for t, tid_ in enumerate(sorted(track_dict.keys())):
+            for tid_ in sorted(track_dict.keys()):
                 # if t < checkpoint_end:
                 #     print("Skipping checkpointed track", tid_)
                 #     continue
 
-                glob_matches = glob.glob(f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*_.pkl")
+                glob_matches = glob.glob(f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
                 print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
                 if len(glob_matches) == 1:
                     print("Loading cached smoothed fast track from", glob_matches[0])
@@ -68,7 +68,7 @@ class Postprocessor(nn.Module):
 
                 if(save_fast_tracks):
                     frame_length = len(smoothed_fast_track_['frame_name'])
-                    print("Saving fast track for", tid, "length in frames", frame_length)
+                    print("Saving fast track for", tid_, "length in frames", frame_length)
                     # It's not clear this ever worked
                     #dict_ava_feat = {}
                     #dict_ava_psudo_labels = {}
@@ -165,7 +165,7 @@ class Postprocessor(nn.Module):
         final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=save_fast_tracks, video_pkl_name=video_pkl_name)
         
         # render the video
-        # NOTE - can't be rendered from the "slim" final_visuals_dic
+        # NOTE - this can't be rendered from the "slim" final_visuals_dic
         if(self.cfg.render.enable):
             self.offline_render(final_visuals_dic, save_pkl_path, save_video_path)
         
