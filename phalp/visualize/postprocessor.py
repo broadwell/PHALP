@@ -78,7 +78,7 @@ class Postprocessor(nn.Module):
                     #smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
                     #smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
                     #smoothed_fast_track_['appearance_dict'] = dict_ava_feat
-                    smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
+                    #smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
 
                     # save the fast tracks in a pkl file
                     save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal_fast/", video_pkl_name, str(tid_) +  "_" + str(frame_length) + ".pkl")
