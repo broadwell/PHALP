@@ -71,12 +71,12 @@ class Postprocessor(nn.Module):
                     print("Saving fast track for", tid, "length in frames", frame_length)
                     dict_ava_feat = {}
                     dict_ava_psudo_labels = {}
-                    for idx, appe_idx in enumerate(smoothed_fast_track_['apperance_index']):
-                        dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['apperance_emb'][idx]
+                    for idx, appe_idx in enumerate(smoothed_fast_track_['appearance_index']):
+                        dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['appearance_emb'][idx]
                         dict_ava_psudo_labels[appe_idx[0,0]] = smoothed_fast_track_['action_emb'][idx]
                     smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
                     smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
-                    smoothed_fast_track_['apperance_dict'] = dict_ava_feat
+                    smoothed_fast_track_['appearance_dict'] = dict_ava_feat
                     smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
 
                     # save the fast tracks in a pkl file
@@ -161,7 +161,7 @@ class Postprocessor(nn.Module):
             return 0
         
         # apply smoothing/action recognition etc.
-        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name)
+        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=save_fast_tracks, video_pkl_name=video_pkl_name)
         
         # render the video
         # NOTE - can't be rendered from the "slim" final_visuals_dic
