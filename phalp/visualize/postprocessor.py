@@ -69,14 +69,15 @@ class Postprocessor(nn.Module):
                 if(save_fast_tracks):
                     frame_length = len(smoothed_fast_track_['frame_name'])
                     print("Saving fast track for", tid, "length in frames", frame_length)
-                    dict_ava_feat = {}
-                    dict_ava_psudo_labels = {}
-                    for idx, appe_idx in enumerate(smoothed_fast_track_['appearance_index']):
-                        dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['appearance_emb'][idx]
-                        dict_ava_psudo_labels[appe_idx[0,0]] = smoothed_fast_track_['action_emb'][idx]
-                    smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
-                    smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
-                    smoothed_fast_track_['appearance_dict'] = dict_ava_feat
+                    # It's not clear this ever worked
+                    #dict_ava_feat = {}
+                    #dict_ava_psudo_labels = {}
+                    #for idx, appe_idx in enumerate(smoothed_fast_track_['appearance_index']):
+                    #    dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['appearance_emb'][idx]
+                    #    dict_ava_psudo_labels[appe_idx[0,0]] = smoothed_fast_track_['action_emb'][idx]
+                    #smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
+                    #smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
+                    #smoothed_fast_track_['appearance_dict'] = dict_ava_feat
                     smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
 
                     # save the fast tracks in a pkl file
