@@ -104,7 +104,7 @@ class Postprocessor(nn.Module):
 
                         slim_visuals_dic[f_key] = {'camera': {}, 'smpl': {}, 'label': {}, 'ava_action': {}}
 
-                        if((final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0) and not (f_key in tracked_times and idx_[0] in tracked_times[f_key][idx_[0]])):
+                        if((final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0) and not (f_key in tracked_times and idx_[0] in tracked_times[f_key])):
                             #final_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
                             #final_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
                             slim_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
