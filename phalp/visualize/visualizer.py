@@ -347,6 +347,8 @@ class Visualizer(nn.Module):
         if "MASK" in self.cfg.render.type:
             image[idx[0], idx[1], :] *= 1.0 - alpha
             image[idx[0], idx[1], :] += [alpha * x for x in cv_color]
+            seg_joints_2d = joints_2d[ids_x]
+            
             if border_alpha == 0:
                 return
 

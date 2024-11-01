@@ -115,7 +115,6 @@ class HMR2023TextureSampler(HMR2Predictor):
         K = K.unsqueeze(0)
         R = torch.eye(3, device=device).unsqueeze(0)
         t = torch.zeros(3, device=device).unsqueeze(0)
-
         rend_depth = self.neural_renderer(pred_verts,
                                         face_tensor[None].expand(pred_verts.shape[0], -1, -1).int(),
                                         # textures=texture_atlas_rgb,
@@ -132,8 +131,8 @@ class HMR2023TextureSampler(HMR2Predictor):
         visibility_mask = map_verts_depth <= (rend_depth_at_proj + 1e-4) # B,N
         img_rgba_at_proj[:,3,:][~visibility_mask] = 0
     
+        # Paste image back onto square uv_image
         try:
-            # Paste image back onto square uv_image
             uv_image = torch.zeros((batch['img'].shape[0], 4, 256, 256), dtype=torch.float, device=device)
             uv_image[:, :, valid_mask] = img_rgba_at_proj
         except Exception as e:
@@ -149,7 +148,6 @@ class HMR2023TextureSampler(HMR2Predictor):
             'pose_smpl': model_out['pred_smpl_params'],
             'pred_cam':  model_out['pred_cam'],
         }
-
         return out
 
 class HMR2_4dhuman(PHALP):
