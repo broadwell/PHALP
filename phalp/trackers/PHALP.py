@@ -38,7 +38,7 @@ from phalp.visualize.visualizer import Visualizer
 
 log = get_pylogger(__name__)
 
-TIMES_TO_SKIP = [107924]
+TIMES_TO_SKIP = []
 
 class PHALP(nn.Module):
 
