@@ -64,7 +64,7 @@ class HMRConfig:
 @dataclass
 class RenderConfig:
     enable: bool = True # for inference only, no viz
-    type: str = 'HUMAN_MESH' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
+    type: str = 'HUMAN_MASK' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
     up_scale: int = 2
     res: int = 256
     side_view_each: bool = False
@@ -76,7 +76,7 @@ class RenderConfig:
     output_resolution: int = 1440
     fps: int = 30
     blur_faces: bool = False
-    show_keypoints: bool = False
+    show_keypoints: bool = True
 
 @dataclass
 class PostProcessConfig:

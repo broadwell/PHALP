@@ -212,6 +212,10 @@ class Visualizer(nn.Module):
         joints_2d *= img_size
         joints_2d[:, 1] -= (max(img_width, img_height) - min(img_width, img_height)) / 2
 
+        point_color = ImageColor.getrgb("lime")
+        for joint in joints_2d:
+            cv2.circle(cv_image, joint.astype(int).tolist(), radius=1, color=point_color, thickness=-1)
+
         coco17_joints = merge_coords(joints_2d, phalp_to_coco_17)
 
         for i, seg in enumerate(COCO_17_SKELETON):
@@ -620,6 +624,7 @@ class Visualizer(nn.Module):
 
             if len(tracked_ids_x) > 0:
                 if "MESH" in self.cfg.render.type:
+                    seg_joints_2d = joints_2d[ids_x]
                     rendered_image_final, valid_mask = self.render_single_frame(
                         tracked_smpl[ids_x],
                         tracked_cameras[ids_x],
@@ -644,6 +649,15 @@ class Visualizer(nn.Module):
                     rendered_image_final = rendered_image_final[
                         :, :, top_ : top_ + img_height_, left_ : left_ + img_width_
                     ]
+
+                    # PMB
+                    cv_image = rendered_image_final.astype(np.uint8)
+                    for i, tr in enumerate(tracked_ids_x):
+                        seg_joints_2d_ = seg_joints_2d[i]
+                        cv_image = self.visualize_armatures(cv_image, seg_joints_2d_)
+                    rendered_image_final = numpy_to_torch_image(
+                        np.array(cv_image) / 255.0
+                    )
 
                 if "MASK" in self.cfg.render.type or "BBOX" in self.cfg.render.type:
                     seg_mask = tracked_mask[ids_x]

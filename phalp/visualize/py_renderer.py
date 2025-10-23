@@ -101,7 +101,11 @@ class Renderer:
         self.roughnessFactor = roughnessFactor
     
     def __del__(self):
-        del self.renderer
+        # PMB added exception handler
+        try:
+            del self.renderer
+        except Exception as e:
+            pass
     
     def visualize_all(self, vertices, camera_translation, color, images, use_image=True):
 
@@ -151,7 +155,7 @@ class Renderer:
       
 	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
         # See https://github.com/mmatl/pyrender/issues/148 
-        self.__del__()
+        # self.__del__()
  
         return color
 

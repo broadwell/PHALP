@@ -150,7 +150,7 @@ class IO_Manager():
         self.video = None
 
     def save_video(self, video_path, rendered_, f_size, t=0):
-        if(t==0):
+        if(self.video is None or t==0):
             self.video = {
                 "video": cv2.VideoWriter(video_path, cv2.VideoWriter_fourcc(*'mp4v'), self.output_fps, frameSize=f_size),
                 "path" : video_path,
