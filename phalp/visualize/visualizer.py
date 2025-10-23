@@ -203,18 +203,18 @@ class Visualizer(nn.Module):
 
         return image
 
-    def visualize_armatures(self, cv_image, pred_joints_2d):
+    def visualize_armatures(self, base_image, pred_joints_2d):
         joints_2d = copy.deepcopy(pred_joints_2d)
 
-        img_height, img_width, _ = cv_image.shape
+        img_height, img_width, _ = base_image.shape
         img_size = max(img_height, img_width)
         joints_2d = joints_2d.reshape(-1, 2)
         joints_2d *= img_size
         joints_2d[:, 1] -= (max(img_width, img_height) - min(img_width, img_height)) / 2
 
-        point_color = ImageColor.getrgb("lime")
+        point_color = ImageColor.getrgb("white")
         for joint in joints_2d:
-            cv2.circle(cv_image, joint.astype(int).tolist(), radius=1, color=point_color, thickness=-1)
+            cv2.circle(base_image, joint.astype(int).tolist(), radius=2, color=point_color, thickness=-1)
 
         coco17_joints = merge_coords(joints_2d, phalp_to_coco_17)
 
@@ -231,9 +231,9 @@ class Visualizer(nn.Module):
                 round(coco17_joints[seg[1] - 1][1]),
             )
 
-            cv2.line(cv_image, pt1, pt2, line_color, thickness=2)
+            cv2.line(base_image, pt1, pt2, line_color, thickness=2)
 
-        return cv_image
+        return base_image
 
     def visualize_mask(
         self,
@@ -634,6 +634,11 @@ class Visualizer(nn.Module):
                         use_image=True,
                     )
 
+                    # PMB
+                    for i, tr in enumerate(tracked_ids_x):
+                        seg_joints_2d_ = seg_joints_2d[i]
+                        rendered_image_final = self.visualize_armatures(rendered_image_final, seg_joints_2d_)
+
                     rendered_image_final = numpy_to_torch_image(
                         np.array(rendered_image_final)
                     )
@@ -649,15 +654,6 @@ class Visualizer(nn.Module):
                     rendered_image_final = rendered_image_final[
                         :, :, top_ : top_ + img_height_, left_ : left_ + img_width_
                     ]
-
-                    # PMB
-                    cv_image = rendered_image_final.astype(np.uint8)
-                    for i, tr in enumerate(tracked_ids_x):
-                        seg_joints_2d_ = seg_joints_2d[i]
-                        cv_image = self.visualize_armatures(cv_image, seg_joints_2d_)
-                    rendered_image_final = numpy_to_torch_image(
-                        np.array(cv_image) / 255.0
-                    )
 
                 if "MASK" in self.cfg.render.type or "BBOX" in self.cfg.render.type:
                     seg_mask = tracked_mask[ids_x]
