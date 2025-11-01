@@ -117,13 +117,17 @@ class Renderer:
         verts = verts + cam_trans 
         
         color = self.__call__(verts, focal_length=fl, baseColorFactors=baseColorFactors)
-            
-        valid_mask = color[:,:,3:4]
-        if(use_image):
-            output_img = color[:, :, :3] * valid_mask + (1 - valid_mask) * images
-        else:
-            output_img = color[:, :, :3]
-        return output_img, valid_mask
+        
+        try:    
+            valid_mask = color[:,:,3:4]
+            if(use_image):
+                output_img = color[:, :, :3] * valid_mask + (1 - valid_mask) * images
+            else:
+                output_img = color[:, :, :3]
+            return output_img, valid_mask
+        except Exception as e:
+            print("Error in visualize_all:", e)
+            raise e
     
     def __call__(self, vertices, focal_length=5000, baseColorFactors=[(1.0, 1.0, 0.9, 1.0)]):
         scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 0.0],
@@ -149,9 +153,13 @@ class Renderer:
         camera_node = pyrender.Node(camera=camera, matrix=camera_pose)
         scene.add_node(camera_node)
         self.add_lighting(scene, camera_node)
-        
-        color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
-        color = color.astype(np.float32) / 255.0
+      
+        try: 
+            color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
+            color = color.astype(np.float32) / 255.0
+        except Exception as e:
+            print("Error in rendering:", e)
+            return None
       
 	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
         # See https://github.com/mmatl/pyrender/issues/148 

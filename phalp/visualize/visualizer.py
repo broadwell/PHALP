@@ -165,13 +165,17 @@ class Visualizer(nn.Module):
         pred_cam_t = torch.tensor(pred_cam_t, device=self.device)
         pred_cam_t_bs = pred_cam_t.unsqueeze(1).repeat(1, pred_vertices.size(1), 1)
 
-        rgb_from_pred, validmask = self.render.visualize_all(
-            pred_vertices.numpy(),
-            pred_cam_t_bs.cpu().numpy(),
-            color,
-            image,
-            use_image=use_image,
-        )
+        try:
+            rgb_from_pred, validmask = self.render.visualize_all(
+                pred_vertices.numpy(),
+                pred_cam_t_bs.cpu().numpy(),
+                color,
+                image,
+                use_image=use_image,
+            )
+        except Exception as e:
+            print("Error in render_single_frame", e)
+            return image, np.zeros((image.shape[0], image.shape[1], 3))
 
         return rgb_from_pred, validmask
 
@@ -205,6 +209,10 @@ class Visualizer(nn.Module):
 
     def visualize_armatures(self, base_image, pred_joints_2d):
         joints_2d = copy.deepcopy(pred_joints_2d)
+
+        # PMB
+        if base_image is None:
+            return None
 
         img_height, img_width, _ = base_image.shape
         img_size = max(img_height, img_width)
@@ -637,7 +645,12 @@ class Visualizer(nn.Module):
                     # PMB
                     for i, tr in enumerate(tracked_ids_x):
                         seg_joints_2d_ = seg_joints_2d[i]
-                        rendered_image_final = self.visualize_armatures(rendered_image_final, seg_joints_2d_)
+                        
+                        new_rendered_image = self.visualize_armatures(rendered_image_final, seg_joints_2d_)
+
+                        # PMB
+                        if new_rendered_image is not None:
+                            rendered_image_final = new_rendered_image
 
                     rendered_image_final = numpy_to_torch_image(
                         np.array(rendered_image_final)
