@@ -16,7 +16,7 @@ class VideoConfig:
     start_frame: int = -1
     end_frame: int = -1
     useffmpeg: bool = False
-    vis_results: bool = True # False = inference only, no vis
+    vis_results: bool = False # False = inference only, no vis
 
     # this will be used if extract_video=False
     start_time: str = '0s'
