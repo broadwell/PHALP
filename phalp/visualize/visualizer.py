@@ -13,6 +13,8 @@ from torchvision.utils import make_grid
 from phalp.utils.utils import get_colors, numpy_to_torch_image, perspective_projection
 from phalp.visualize.py_renderer import Renderer
 
+USE_IMAGE = True
+
 COCO_17_SKELETON = [
     (16, 14),
     (14, 12),
@@ -410,7 +412,7 @@ class Visualizer(nn.Module):
         pred_keypoints_2d_smpl[:, :, 0] -= (img_size - img_w) / 2
         pred_keypoints_2d_smpl[:, :, 1] -= (img_size - img_h) / 2
 
-        # # draw keypoints
+        # draw keypoints
         if self.cfg.render.show_keypoints:
             for i, box in enumerate(bbox):
                 cv_color = np.array([color[i][2], color[i][1], color[i][0]]) * 255
@@ -524,7 +526,7 @@ class Visualizer(nn.Module):
 
         return image
 
-    def render_video(self, final_visuals_dic):
+    def render_video(self, final_visuals_dic, use_image=USE_IMAGE):
         t_ = final_visuals_dic["time"]
         shot_ = final_visuals_dic["shot"]
         cv_image = final_visuals_dic["frame"]
@@ -639,7 +641,7 @@ class Visualizer(nn.Module):
                         tracked_colors,
                         img_size=render_image_size,
                         image=(0 * image_resized) / 255.0,
-                        use_image=True,
+                        use_image=use_image,
                     )
 
                     # PMB
@@ -648,10 +650,9 @@ class Visualizer(nn.Module):
                         
                         new_rendered_image = self.visualize_armatures(rendered_image_final, seg_joints_2d_)
 
-                        # PMB
                         if new_rendered_image is not None:
                             rendered_image_final = new_rendered_image
-
+                   
                     rendered_image_final = numpy_to_torch_image(
                         np.array(rendered_image_final)
                     )
@@ -664,6 +665,7 @@ class Visualizer(nn.Module):
                         valid_mask * rendered_image_final
                         + (1 - valid_mask) * image_resized_rgb
                     )
+
                     rendered_image_final = rendered_image_final[
                         :, :, top_ : top_ + img_height_, left_ : left_ + img_width_
                     ]

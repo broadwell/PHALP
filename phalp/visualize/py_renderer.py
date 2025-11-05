@@ -3,6 +3,7 @@ import torch
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 import numpy as np
 import pyrender
+import time
 import trimesh
 
 
@@ -93,7 +94,12 @@ class Renderer:
     Code adapted from https://github.com/vchoutas/smplify-x
     """
     def __init__(self, focal_length=5000, img_res=224, faces=None, metallicFactor=0.0, roughnessFactor=0.5):
-        self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
+        # PMB
+        try:
+            self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
+        except Exception as _:
+            time.sleep(.1)
+            self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
         self.focal_length = focal_length
         self.camera_center = [img_res // 2, img_res // 2]
         self.faces = faces
@@ -104,7 +110,7 @@ class Renderer:
         # PMB added exception handler
         try:
             del self.renderer
-        except Exception as e:
+        except Exception as _:
             pass
     
     def visualize_all(self, vertices, camera_translation, color, images, use_image=True):
@@ -117,13 +123,23 @@ class Renderer:
         verts = verts + cam_trans 
         
         color = self.__call__(verts, focal_length=fl, baseColorFactors=baseColorFactors)
-        
-        try:    
+            
+        try:
             valid_mask = color[:,:,3:4]
+
+            # PMB
+            mask = valid_mask[:, :, None]
+            idx = np.nonzero(mask)
+
             if(use_image):
                 output_img = color[:, :, :3] * valid_mask + (1 - valid_mask) * images
             else:
                 output_img = color[:, :, :3]
+
+            # PMB attempting manual alpha blend
+            #output_img[idx[0], idx[1], :] *= .5
+            valid_mask[idx[0], idx[1], :] *= .7
+
             return output_img, valid_mask
         except Exception as e:
             print("Error in visualize_all:", e)
@@ -138,6 +154,7 @@ class Renderer:
                 metallicFactor=self.metallicFactor,
                 roughnessFactor=self.roughnessFactor,
                 alphaMode='OPAQUE',
+                #alphaMode='BLEND',
                 baseColorFactor=baseColorFactors[i_])
             
             mesh = trimesh.Trimesh(verts.copy(), self.faces.copy())
@@ -161,9 +178,12 @@ class Renderer:
             print("Error in rendering:", e)
             return None
       
-	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
+	# PMB Need to do this to avoid spurious OpenGL errors
         # See https://github.com/mmatl/pyrender/issues/148 
-        # self.__del__()
+        try:
+            self.__del__()
+        except Exception as _:
+            pass
  
         return color
 

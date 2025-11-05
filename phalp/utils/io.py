@@ -43,8 +43,8 @@ class IO_Manager():
             youtube_video.streams.get_highest_resolution().download(output_path = self.cfg.video.output_dir + "/_DEMO/" + video_name, filename="youtube.mp4")
             source_path = self.cfg.video.output_dir + "/_DEMO/" + video_name + "/youtube.mp4"
 
+        # .webm is not fully supported for viz tasks
         if(source_path.endswith((".mp4", ".mkv"))):
-        #if(source_path.endswith(".mp4")):
             # find a proper video name based on the source path
             video_name = source_path.split('/')[-1].split('.')[0]
             video_ext = source_path.split('.')[-1]
