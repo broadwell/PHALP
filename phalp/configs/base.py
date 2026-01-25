@@ -76,7 +76,7 @@ class RenderConfig:
     output_resolution: int = 1440
     fps: int = 30
     blur_faces: bool = False
-    show_keypoints: bool = False
+    show_keypoints: bool = True
 
 @dataclass
 class PostProcessConfig:

@@ -13,6 +13,8 @@ from torchvision.utils import make_grid
 from phalp.utils.utils import get_colors, numpy_to_torch_image, perspective_projection
 from phalp.visualize.py_renderer import Renderer
 
+USE_IMAGE = True
+
 COCO_17_SKELETON = [
     (16, 14),
     (14, 12),
@@ -165,13 +167,17 @@ class Visualizer(nn.Module):
         pred_cam_t = torch.tensor(pred_cam_t, device=self.device)
         pred_cam_t_bs = pred_cam_t.unsqueeze(1).repeat(1, pred_vertices.size(1), 1)
 
-        rgb_from_pred, validmask = self.render.visualize_all(
-            pred_vertices.numpy(),
-            pred_cam_t_bs.cpu().numpy(),
-            color,
-            image,
-            use_image=use_image,
-        )
+        try:
+            rgb_from_pred, validmask = self.render.visualize_all(
+                pred_vertices.numpy(),
+                pred_cam_t_bs.cpu().numpy(),
+                color,
+                image,
+                use_image=use_image,
+            )
+        except Exception as e:
+            print("Error in render_single_frame", e)
+            return image, np.zeros((image.shape[0], image.shape[1], 3))
 
         return rgb_from_pred, validmask
 
@@ -203,14 +209,22 @@ class Visualizer(nn.Module):
 
         return image
 
-    def visualize_armatures(self, cv_image, pred_joints_2d):
+    def visualize_armatures(self, base_image, pred_joints_2d):
         joints_2d = copy.deepcopy(pred_joints_2d)
 
-        img_height, img_width, _ = cv_image.shape
+        # PMB
+        if base_image is None:
+            return None
+
+        img_height, img_width, _ = base_image.shape
         img_size = max(img_height, img_width)
         joints_2d = joints_2d.reshape(-1, 2)
         joints_2d *= img_size
         joints_2d[:, 1] -= (max(img_width, img_height) - min(img_width, img_height)) / 2
+
+        point_color = ImageColor.getrgb("white")
+        for joint in joints_2d:
+            cv2.circle(base_image, joint.astype(int).tolist(), radius=2, color=point_color, thickness=-1)
 
         coco17_joints = merge_coords(joints_2d, phalp_to_coco_17)
 
@@ -227,9 +241,9 @@ class Visualizer(nn.Module):
                 round(coco17_joints[seg[1] - 1][1]),
             )
 
-            cv2.line(cv_image, pt1, pt2, line_color, thickness=2)
+            cv2.line(base_image, pt1, pt2, line_color, thickness=2)
 
-        return cv_image
+        return base_image
 
     def visualize_mask(
         self,
@@ -398,7 +412,7 @@ class Visualizer(nn.Module):
         pred_keypoints_2d_smpl[:, :, 0] -= (img_size - img_w) / 2
         pred_keypoints_2d_smpl[:, :, 1] -= (img_size - img_h) / 2
 
-        # # draw keypoints
+        # draw keypoints
         if self.cfg.render.show_keypoints:
             for i, box in enumerate(bbox):
                 cv_color = np.array([color[i][2], color[i][1], color[i][0]]) * 255
@@ -512,7 +526,7 @@ class Visualizer(nn.Module):
 
         return image
 
-    def render_video(self, final_visuals_dic):
+    def render_video(self, final_visuals_dic, use_image=USE_IMAGE):
         t_ = final_visuals_dic["time"]
         shot_ = final_visuals_dic["shot"]
         cv_image = final_visuals_dic["frame"]
@@ -620,15 +634,25 @@ class Visualizer(nn.Module):
 
             if len(tracked_ids_x) > 0:
                 if "MESH" in self.cfg.render.type:
+                    seg_joints_2d = joints_2d[ids_x]
                     rendered_image_final, valid_mask = self.render_single_frame(
                         tracked_smpl[ids_x],
                         tracked_cameras[ids_x],
                         tracked_colors,
                         img_size=render_image_size,
                         image=(0 * image_resized) / 255.0,
-                        use_image=True,
+                        use_image=use_image,
                     )
 
+                    # PMB
+                    for i, tr in enumerate(tracked_ids_x):
+                        seg_joints_2d_ = seg_joints_2d[i]
+                        
+                        new_rendered_image = self.visualize_armatures(rendered_image_final, seg_joints_2d_)
+
+                        if new_rendered_image is not None:
+                            rendered_image_final = new_rendered_image
+                   
                     rendered_image_final = numpy_to_torch_image(
                         np.array(rendered_image_final)
                     )
@@ -641,6 +665,7 @@ class Visualizer(nn.Module):
                         valid_mask * rendered_image_final
                         + (1 - valid_mask) * image_resized_rgb
                     )
+
                     rendered_image_final = rendered_image_final[
                         :, :, top_ : top_ + img_height_, left_ : left_ + img_width_
                     ]

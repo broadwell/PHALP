@@ -3,6 +3,7 @@ import torch
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 import numpy as np
 import pyrender
+import time
 import trimesh
 
 
@@ -93,7 +94,12 @@ class Renderer:
     Code adapted from https://github.com/vchoutas/smplify-x
     """
     def __init__(self, focal_length=5000, img_res=224, faces=None, metallicFactor=0.0, roughnessFactor=0.5):
-        self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
+        # PMB
+        try:
+            self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
+        except Exception as _:
+            time.sleep(.1)
+            self.renderer = pyrender.OffscreenRenderer(viewport_width=img_res, viewport_height=img_res, point_size=1.0)
         self.focal_length = focal_length
         self.camera_center = [img_res // 2, img_res // 2]
         self.faces = faces
@@ -101,7 +107,11 @@ class Renderer:
         self.roughnessFactor = roughnessFactor
     
     def __del__(self):
-        del self.renderer
+        # PMB added exception handler
+        try:
+            del self.renderer
+        except Exception as _:
+            pass
     
     def visualize_all(self, vertices, camera_translation, color, images, use_image=True):
 
@@ -114,12 +124,26 @@ class Renderer:
         
         color = self.__call__(verts, focal_length=fl, baseColorFactors=baseColorFactors)
             
-        valid_mask = color[:,:,3:4]
-        if(use_image):
-            output_img = color[:, :, :3] * valid_mask + (1 - valid_mask) * images
-        else:
-            output_img = color[:, :, :3]
-        return output_img, valid_mask
+        try:
+            valid_mask = color[:,:,3:4]
+
+            # PMB
+            mask = valid_mask[:, :, None]
+            idx = np.nonzero(mask)
+
+            if(use_image):
+                output_img = color[:, :, :3] * valid_mask + (1 - valid_mask) * images
+            else:
+                output_img = color[:, :, :3]
+
+            # PMB attempting manual alpha blend
+            #output_img[idx[0], idx[1], :] *= .5
+            valid_mask[idx[0], idx[1], :] *= .7
+
+            return output_img, valid_mask
+        except Exception as e:
+            print("Error in visualize_all:", e)
+            raise e
     
     def __call__(self, vertices, focal_length=5000, baseColorFactors=[(1.0, 1.0, 0.9, 1.0)]):
         scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 0.0],
@@ -130,6 +154,7 @@ class Renderer:
                 metallicFactor=self.metallicFactor,
                 roughnessFactor=self.roughnessFactor,
                 alphaMode='OPAQUE',
+                #alphaMode='BLEND',
                 baseColorFactor=baseColorFactors[i_])
             
             mesh = trimesh.Trimesh(verts.copy(), self.faces.copy())
@@ -145,13 +170,20 @@ class Renderer:
         camera_node = pyrender.Node(camera=camera, matrix=camera_pose)
         scene.add_node(camera_node)
         self.add_lighting(scene, camera_node)
-        
-        color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
-        color = color.astype(np.float32) / 255.0
       
-	# PMB XXX Might need to do this to avoid spurious OpenGL errors?
+        try: 
+            color, rend_depth = self.renderer.render(scene, flags=pyrender.RenderFlags.RGBA)
+            color = color.astype(np.float32) / 255.0
+        except Exception as e:
+            print("Error in rendering:", e)
+            return None
+      
+	# PMB Need to do this to avoid spurious OpenGL errors
         # See https://github.com/mmatl/pyrender/issues/148 
-        self.__del__()
+        try:
+            self.__del__()
+        except Exception as _:
+            pass
  
         return color
 
