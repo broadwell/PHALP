@@ -38,6 +38,8 @@ from phalp.visualize.visualizer import Visualizer
 
 log = get_pylogger(__name__)
 
+TIMES_TO_SKIP = []
+
 class PHALP(nn.Module):
 
     def __init__(self, cfg):
@@ -223,14 +225,25 @@ class PHALP(nn.Module):
                     # TODO: add a flag for full resolution rendering
                     self.cfg.render.up_scale = int(self.cfg.render.output_resolution / self.cfg.render.res)
                     self.visualizer.reset_render(self.cfg.render.res*self.cfg.render.up_scale)
-                
+              
+                # PMB moved the data initialization up to here, in case we need to skip the frame
+                # and keep most of its values null (but present) if it is a "landmine" frame
+                final_visuals_dic.setdefault(frame_name, {'time': t_, 'shot': self.cfg.phalp.shot, 'frame_path': frame_name})
+                for key_ in visual_store_: final_visuals_dic[frame_name][key_] = []
+
+                if(int(t_) in TIMES_TO_SKIP):
+                    log.info("Frame is flagged as problematic, skipping: " + str(frame_name) + ", time " + str(t_))
+                    continue
+ 
                 ############ detection ##############
+                # PMB this may be implicated in random show-stopper memory errors
                 pred_bbox, pred_bbox_pad, pred_masks, pred_scores, pred_classes, gt_tids, gt_annots = self.get_detections(image_frame, frame_name, t_, additional_data, measurments)
 
                 ############ Run EXTRA models to attach to the detections ##############
                 extra_data = self.run_additional_models(image_frame, pred_bbox, pred_masks, pred_scores, pred_classes, frame_name, t_, measurments, gt_tids, gt_annots)
                 
                 ############ HMAR ##############
+                # PMB this may be implicated in random show-stopper memory errors
                 detections = self.get_human_features(image_frame, pred_masks, pred_bbox, pred_bbox_pad, pred_scores, frame_name, pred_classes, t_, measurments, gt_tids, gt_annots, extra_data)
 
                 ############ tracking ##############
@@ -238,9 +251,7 @@ class PHALP(nn.Module):
                 self.tracker.update(detections, t_, frame_name, self.cfg.phalp.shot)
 
                 ############ record the results ##############
-                final_visuals_dic.setdefault(frame_name, {'time': t_, 'shot': self.cfg.phalp.shot, 'frame_path': frame_name})
                 if(self.cfg.render.enable): final_visuals_dic[frame_name]['frame'] = image_frame
-                for key_ in visual_store_: final_visuals_dic[frame_name][key_] = []
                 
                 ############ record the track states (history and predictions) ##############
                 for tracks_ in self.tracker.tracks:
@@ -306,7 +317,12 @@ class PHALP(nn.Module):
             
         except Exception as e: 
             print(e)
-            print(traceback.format_exc())         
+            print(traceback.format_exc())
+            log.info("ERROR PROCESSING FRAME " + str(frame_name) + " TIME " + str(t_))
+            if(t_ > 0):
+                pkl_chkpt_path = f"{pkl_path}.{t_}"
+                if(not os.path.isfile(pkl_chkpt_path)):
+                    joblib.dump(final_visuals_dic, pkl_chkpt_path, compress=3)
 
     def get_detections(self, image, frame_name, t_, additional_data=None, measurments=None):
         
@@ -344,9 +360,9 @@ class PHALP(nn.Module):
                 x2 = bbox_[2] + x1
                 y2 = bbox_[3] + y1
 
-            bbox_array.append([x1, y1, x2, y2])
-            class_array.append(0)
-            scores_array.append(1)
+                bbox_array.append([x1, y1, x2, y2])
+                class_array.append(0)
+                scores_array.append(1)
                     
             bbox_array          = np.array(bbox_array)
             class_array         = np.array(class_array)

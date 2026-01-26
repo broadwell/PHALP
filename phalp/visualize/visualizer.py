@@ -90,6 +90,80 @@ def merge_coords(all_coords, guide_to_merge):
     return np.array(new_coords)
 
 
+COCO_17_SKELETON = [
+    (16, 14),
+    (14, 12),
+    (17, 15),
+    (15, 13),
+    (12, 13),
+    (6, 12),
+    (7, 13),
+    (6, 7),
+    (6, 8),
+    (7, 9),
+    (8, 10),
+    (9, 11),
+    (2, 3),
+    (1, 2),
+    (1, 3),
+    (2, 4),
+    (3, 5),
+    (4, 6),
+    (5, 7),
+]
+
+COCO_COLORS = [
+    "orangered",
+    "orange",
+    "blue",
+    "lightblue",
+    "darkgreen",
+    "red",
+    "lightgreen",
+    "pink",
+    "plum",
+    "purple",
+    "brown",
+    "saddlebrown",
+    "mediumorchid",
+    "gray",
+    "salmon",
+    "chartreuse",
+    "lightgray",
+    "darkturquoise",
+    "goldenrod",
+]
+
+phalp_to_coco_17 = [
+    [0],
+    [16],
+    [15],
+    [18],
+    [17],
+    [5, 34],
+    [2, 33],
+    [6, 35],
+    [3, 32],
+    [7, 36],
+    [4, 31],
+    [28],
+    [27],
+    [13, 29],
+    [10, 26],
+    [14, 30],
+    [11, 25],
+]
+
+
+def merge_coords(all_coords, guide_to_merge):
+    new_coords = []
+    for to_merge in guide_to_merge:
+        x_avg = sum([all_coords[i][0] for i in to_merge]) / len(to_merge)
+        y_avg = sum([all_coords[i][1] for i in to_merge]) / len(to_merge)
+        new_coords.append([x_avg, y_avg])
+
+    return np.array(new_coords)
+
 def rect_with_opacity(image, top_left, bottom_right, fill_color, fill_opacity):
     with_fill = image.copy()
     with_fill = cv2.rectangle(with_fill, top_left, bottom_right, fill_color, cv2.FILLED)
@@ -287,7 +361,8 @@ class Visualizer(nn.Module):
         if "MASK" in self.cfg.render.type:
             image[idx[0], idx[1], :] *= 1.0 - alpha
             image[idx[0], idx[1], :] += [alpha * x for x in cv_color]
-
+            seg_joints_2d = joints_2d[ids_x]
+            
             if border_alpha == 0:
                 return
 

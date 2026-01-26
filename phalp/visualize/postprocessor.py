@@ -1,7 +1,10 @@
 import copy
 
+import glob
 import os
+import re
 import cv2
+from pathlib import Path
 import joblib
 import numpy as np
 import torch
@@ -13,6 +16,7 @@ from phalp.utils.utils_tracks import create_fast_tracklets, get_tracks
 from phalp.utils.utils import pose_camera_vector_to_smpl
 from phalp.utils.lart_utils import to_ava_labels
 
+# CHECKPOINT_INTERVAL = 10 # in tracks
 
 class Postprocessor(nn.Module):
     
@@ -25,87 +29,161 @@ class Postprocessor(nn.Module):
 
     def post_process(self, final_visuals_dic, save_fast_tracks=False, video_pkl_name=""):
 
+        print("In post_process")
         if(self.cfg.post_process.apply_smoothing):
-            final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
-            track_dict = get_tracks(final_visuals_dic_)
-
-            for tid_ in track_dict.keys():
-                fast_track_ = create_fast_tracklets(track_dict[tid_])
+            print("Copying final visuals dictionary")
+            # This seems to only be used to flag whether a track has already been processed,
+            # so there must be a more efficient way to manage it here
+            #final_visuals_dic_ = copy.deepcopy(final_visuals_dic)
+            tracked_times = {} # This will keep track of whether a track has been processed
+            slim_visuals_dic = {} # Similarly, we don't have to save the values that are dupliated in the PHALP output
+            print("Loading tracks")
+            #track_dict = get_tracks(final_visuals_dic_)
+            cache_dir = self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name + "/"
+            get_tracks(final_visuals_dic, cache_dir=cache_dir)
             
-                with torch.no_grad():
-                    smoothed_fast_track_ = self.phalp_tracker.pose_predictor.smooth_tracks(fast_track_, moving_window=True, step=32, window=32)
+            track_dict = {}
+            for track_fn in glob.glob(cache_dir + "*.pkl"):
+                tid = int(track_fn.split("/")[-1].replace(".pkl", ""))
+                print("Loading cached track frames for", tid)
+                track_dict[tid] = joblib.load(track_fn)
 
-                if(save_fast_tracks):
-                    frame_length = len(smoothed_fast_track_['frame_name'])
-                    dict_ava_feat = {}
-                    dict_ava_psudo_labels = {}
-                    for idx, appe_idx in enumerate(smoothed_fast_track_['apperance_index']):
-                        dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['apperance_emb'][idx]
-                        dict_ava_psudo_labels[appe_idx[0,0]] = smoothed_fast_track_['action_emb'][idx]
-                    smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
-                    smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
-                    smoothed_fast_track_['apperance_dict'] = dict_ava_feat
-                    smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
+            print("Total # of tracks:", len(list(track_dict.keys())))
+            
+            for tid_ in sorted(track_dict.keys()):
+                # if t < checkpoint_end:
+                #     print("Skipping checkpointed track", tid_)
+                #     continue
 
-                    # save the fast tracks in a pkl file
-                    save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal_fast/", video_pkl_name + "_" + str(tid_) +  "_" + str(frame_length) + ".pkl")
-                    joblib.dump(smoothed_fast_track_, save_pkl_path)
+                glob_matches = glob.glob(f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
+                print(len(glob_matches), "cached smoothed fast tracks for", f"{self.cfg.video.output_dir}results_temporal_fast/{video_pkl_name}/{tid_}_*.pkl")
+                if len(glob_matches) == 1:
+                    print("Loading cached smoothed fast track from", glob_matches[0])
+                    smoothed_fast_track_ = joblib.load(glob_matches[0])
+                else:
+                    print("No single match found, creating fast tracklets for", tid_)
+                    fast_track_ = create_fast_tracklets(track_dict[tid_])
+            
+                    print("Smoothing fast track for", tid_)
+                    with torch.no_grad():
+                        smoothed_fast_track_ = self.phalp_tracker.pose_predictor.smooth_tracks(fast_track_, moving_window=True, step=32, window=32)
+
+                    if(save_fast_tracks):
+                        frame_length = len(smoothed_fast_track_['frame_name'])
+                        print("Saving fast track for", tid_, "length in frames", frame_length)
+                        # It's not clear this ever worked
+                        #dict_ava_feat = {}
+                        #dict_ava_psudo_labels = {}
+                        #for idx, appe_idx in enumerate(smoothed_fast_track_['appearance_index']):
+                        #    dict_ava_feat[appe_idx[0,0]] = smoothed_fast_track_['appearance_emb'][idx]
+                        #    dict_ava_psudo_labels[appe_idx[0,0]] = smoothed_fast_track_['action_emb'][idx]
+                        #smoothed_fast_track_['action_label_gt'] = np.zeros((frame_length, 1, 80)).astype(int)
+                        #smoothed_fast_track_['action_label_psudo'] = dict_ava_psudo_labels
+                        #smoothed_fast_track_['appearance_dict'] = dict_ava_feat
+                        #smoothed_fast_track_['pose_shape'] = smoothed_fast_track_['pose_shape'].cpu().numpy()
+
+                        # save the fast tracks in a pkl file
+                        save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal_fast/", video_pkl_name, str(tid_) +  "_" + str(frame_length) + ".pkl")
+                        joblib.dump(smoothed_fast_track_, save_pkl_path)
 
                 for i_ in range(smoothed_fast_track_['pose_shape'].shape[0]):
                     f_key = smoothed_fast_track_['frame_name'][i_]
-                    tids_ = np.array(final_visuals_dic_[f_key]['tid'])
+                    tids_ = np.array(final_visuals_dic[f_key]['tid'])
                     idx_  = np.where(tids_==tid_)[0]
                     
                     if(len(idx_)>0):
 
-                        pose_shape_ = smoothed_fast_track_['pose_shape'][i_]
-                        smpl_camera = pose_camera_vector_to_smpl(pose_shape_[0])
-                        smpl_ = smpl_camera[0]
-                        camera = smpl_camera[1]
-                        camera_ = smoothed_fast_track_['cam_smoothed'][i_][0].cpu().numpy()
+                        if f_key not in slim_visuals_dic:
+                            slim_visuals_dic[f_key] = {'label': {}, 'ava_action': {}}
+                            #slim_visuals_dic[f_key] = {'camera': {}, 'smpl': {}, 'label': {}, 'ava_action': {}}
 
-                        dict_ = {}
-                        for k, v in smpl_.items():
-                            dict_[k] = v
+                        # pose_shape_ = smoothed_fast_track_['pose_shape'][i_]
+                        # smpl_camera = pose_camera_vector_to_smpl(pose_shape_[0])
+                        # smpl_ = smpl_camera[0]
+                        # camera = smpl_camera[1]
+                        # camera_ = smoothed_fast_track_['cam_smoothed'][i_][0].cpu().numpy()
 
-                        if(final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0):
-                            final_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
-                            final_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
-                            final_visuals_dic[f_key]['tracked_time'][idx_[0]] = -1
+                        # dict_ = {}
+                        # for k, v in smpl_.items():
+                        #     dict_[k] = v
+
+                        # if((final_visuals_dic[f_key]['tracked_time'][idx_[0]]>0) and not (f_key in tracked_times and idx_[0] in tracked_times[f_key])):
+                        #     #final_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
+                        #     #final_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
+                        #     slim_visuals_dic[f_key]['camera'][idx_[0]] = np.array([camera_[0], camera_[1], 200*camera_[2]])
+                        #     slim_visuals_dic[f_key]['smpl'][idx_[0]] = copy.deepcopy(dict_)
+                        #     tracked_times.setdefault(f_key, {})[idx_[0]] = -1
+                        #     #final_visuals_dic[f_key]['tracked_time'][idx_[0]] = -1
                         
                         # attach ava labels
                         ava_ = smoothed_fast_track_['ava_action'][i_]
                         ava_ = ava_.cpu()
                         ava_labels, _ = to_ava_labels(ava_, self.cfg)
-                        final_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
-                        final_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
-                        
-        
-        return final_visuals_dic
+                        #final_visuals_dic[f_key].setdefault('label', {})[tid_] = ava_labels
+                        #final_visuals_dic[f_key].setdefault('ava_action', {})[tid_] = ava_
+                        slim_visuals_dic[f_key]['label'][tid_] = ava_labels
+                        slim_visuals_dic[f_key]['ava_action'][tid_] = ava_
 
-    def run_lart(self, phalp_pkl_path):
+                        # Set other desirable frame-level metadata (only if there's a track in this frame)
+                        slim_visuals_dic[f_key]['tid'] = final_visuals_dic[f_key]['tid']
+                        slim_visuals_dic[f_key]['time'] = final_visuals_dic[f_key]['time']
+                        slim_visuals_dic[f_key]['tracked_ids'] = final_visuals_dic[f_key]['tracked_ids']
+
+                # if((t > 0) and (t % CHECKPOINT_INTERVAL == 0)):
+                #     chkpt_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl." + str(t))
+                #     joblib.dump(final_visuals_dic, chkpt_path)
+
+        #return final_visuals_dic
+        return slim_visuals_dic
+
+    def run_lart(self, phalp_pkl_path, save_fast_tracks=False):
         
         # lart_output = {}
-        video_pkl_name = phalp_pkl_path.split("/")[-1].split(".")[0]
+        print("running LART on PHALP pkl file", phalp_pkl_path)
+        # video_pkl_fn = phalp_pkl_path.split("/")[-1]
+        # if(video_pkl_fn.split(".")[-1].isnumeric()):
+        #     video_pkl_name = ".".join(phalp_pkl_path.split("/")[-1].split(".")[:-1]).replace(".pkl", "").replace(".lart", "")
+        #     checkpoint_end = int(video_pkl_fn.split(".")[-1])
+        #     print("Restarting from checkpoint at track count", checkpoint_end)
+        # else:
+        video_pkl_name = phalp_pkl_path.split("/")[-1].replace(".pkl", "")
+        # Probably not doing checkpoints this way anymore
+        # checkpoint_end = 0
+
+        self.cfg.post_process.save_fast_tracks = save_fast_tracks
+
+        print("Loading PHALP .pkl file")
+        # XXX Might be better to make this RAM-bound, not VRAM-bound
+        #torch.serialization.register_package(0, lambda x: x.device.type, lambda x, _: x.cpu())
         final_visuals_dic = joblib.load(phalp_pkl_path)
 
+        # PMB For caching LART track data rather than keeping it in memory
+        os.makedirs(self.cfg.video.output_dir + "/results_tracks/" + video_pkl_name, exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal/", exist_ok=True)
-        os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
+        #os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/", exist_ok=True)
+        os.makedirs(self.cfg.video.output_dir + "/results_temporal_fast/" + video_pkl_name, exist_ok=True)
         os.makedirs(self.cfg.video.output_dir + "/results_temporal_videos/", exist_ok=True)
-        save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".pkl")
+        save_pkl_path = os.path.join(self.cfg.video.output_dir, "results_temporal/", video_pkl_name + ".lart.pkl")
         save_video_path = os.path.join(self.cfg.video.output_dir, "results_temporal_videos/", video_pkl_name + "_.mp4")
 
         if(os.path.exists(save_pkl_path) and not(self.cfg.overwrite)):
             return 0
         
         # apply smoothing/action recognition etc.
-        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=self.cfg.post_process.save_fast_tracks, video_pkl_name=video_pkl_name)
+        final_visuals_dic  = self.post_process(final_visuals_dic, save_fast_tracks=save_fast_tracks, video_pkl_name=video_pkl_name)
         
         # render the video
+        # NOTE - this can't be rendered from the "slim" final_visuals_dic
         if(self.cfg.render.enable):
             self.offline_render(final_visuals_dic, save_pkl_path, save_video_path)
-        
-        joblib.dump(final_visuals_dic, save_pkl_path)
+
+        pkl_path_stem = re.sub(r'\.phalp(\.lart)?\.pkl.*$', '', Path(save_pkl_path).name)
+        friendly_pkl_path = f"{self.cfg.video.output_dir}/results_temporal/{pkl_path_stem}.lart.pkl"
+
+        print(f"Saving action data to smaller, CPU-friendly .pkl file at {friendly_pkl_path}")
+
+        joblib.dump(final_visuals_dic, friendly_pkl_path)
+
 
     def run_renderer(self, phalp_pkl_path):
         

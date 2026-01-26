@@ -1,6 +1,7 @@
 import warnings
 from dataclasses import dataclass
 from pathlib import Path
+import traceback
 from typing import Optional, Tuple
 
 import os
@@ -129,15 +130,17 @@ class HMR2023TextureSampler(HMR2Predictor):
 
         visibility_mask = map_verts_depth <= (rend_depth_at_proj + 1e-4) # B,N
         img_rgba_at_proj[:,3,:][~visibility_mask] = 0
-
+    
         # Paste image back onto square uv_image
         try:
             uv_image = torch.zeros((batch['img'].shape[0], 4, 256, 256), dtype=torch.float, device=device)
             uv_image[:, :, valid_mask] = img_rgba_at_proj
         except Exception as e:
-            print("ERROR pasting image mask, returning None")
+            print("ERROR pasting image mask")
             print(e)
-            return None
+            print(traceback.format_exc())
+            #uv_image = torch.zeros((x.shape[0], 4, 256, 256), dtype=torch.float, device=device)
+            raise e
 
         out = {
             'uv_image':  uv_image,
