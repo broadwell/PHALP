@@ -63,7 +63,7 @@ class HMRConfig:
 
 @dataclass
 class RenderConfig:
-    enable: bool = False # Set to False for inference only, no viz
+    enable: bool = True # Set to False for inference only, no viz
     type: str = 'HUMAN_MESH' # options: HUMAN_MESH, HUMAN_MASK, HUMAN_BBOX
     up_scale: int = 2
     res: int = 256
@@ -86,7 +86,8 @@ class PostProcessConfig:
 
 @dataclass
 class SMPLConfig:
-    MODEL_PATH: str = f"{CACHE_DIR}/phalp/3D/models/smpl/"
+    #MODEL_PATH: str = f"{CACHE_DIR}/phalp/3D/models/smpl/"
+    MODEL_PATH: str = "data/"
     GENDER: str = 'neutral'
     MODEL_TYPE: str = 'smpl'
     NUM_BODY_JOINTS: int = 23
